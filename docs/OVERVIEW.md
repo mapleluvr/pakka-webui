@@ -1,13 +1,20 @@
 # 工作入口
 
-Pakka 的独立 WebUI 与通用 UI 插件宿主。当前采用的目标见 [WebUI state](state/webui.md)，仓库建立的范围与来源见[初始化记录](changes/repository-bootstrap.md)。
+Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI state](state/webui.md)，现有源码与构建入口见 [UI SDK](development/UI-SDK.md)及 [README](../README.md)。
 
 ## 当前状态
 
-本仓处于初始化状态，仅有说明与开发约定。Pakka 侧已完成[阶段 0 消费盘点](https://github.com/mapleluvr/pakka/blob/29cb207ec7b305e2e0a559f3de30a7a21b490228/openspec/changes/plan-independent-webui/inventory.md)；独立协议/client/SDK、React/Astryx 真实宿主与功能迁移仍待实施。
+本仓从初始化基线 0ee6bdc 开始形成新的纯浏览器 `@pakka/webui-sdk`，不以旧 Preact 产物为架构模板。当前已有贡献/资源/命令声明、单个 UI 实例生命周期、共享 React context 和共同构建的 React/Astryx/主题/CSS runtime；Pakka 协议、服务客户端、模型配置和 Node 资产读取由后端仓库维护。
 
-## 下一步
+已运行仓库外干净安装/类型/构建及真实浏览器消费：插件与宿主共享 React、SDK/Astryx context 和 portal；静态主题符合现有 CSP，Dialog/focus 与实例卸载清理成立。结果限定于开发接缝，不等于完整应用或业务插件验收，见[接缝记录](changes/independent-seams.md)。
 
-按[阶段任务](https://github.com/mapleluvr/pakka/blob/29cb207ec7b305e2e0a559f3de30a7a21b490228/openspec/changes/plan-independent-webui/tasks.md)接续阶段 1 的公开消费接缝：明确协议/client/UI SDK/Backend 出口与固定制品，验证仓库外安装，并处理资源身份/原历史读取、模型配置与资产装配。
+完整前端入口、开发服务器、Pakka 应用接入层、Conversation 与参数编辑页面尚未形成。共享 runtime manifest 的 entry 为 null、workers 为空，不能直接作为完整 WebUI 启动。
 
-随后才验证真实宿主、纯 UI 插件、RSI 读取/编辑、模型/Thinking 双入口与两个 Session 的原历史浏览。仓库创建本身不替代这些退出条件。
+## 下一步与阻塞
+
+- Pakka 的阶段 1 任务 3.2 仍未完成：未加载原 Session 缺公开只读历史来源，独立分 facet 控制未形成。已加载资源的身份/权限解析、完整资产身份与 reconnect 不代替这两项能力。
+- 阶段 2 形成真实应用壳层与 registry、纯 UI 插件和新 SDK 业务插件、模型/Thinking 双入口、参数编辑及跨 Session 原历史消费。
+- 开发服务器需提供与开发 JSX emission 匹配的共享 runtime，不能混用当前 production runtime 或引入第二份 React。
+- Provider `/login` 继续按 roadmap 延期；不为本轮准备 API key/OAuth 交互，不切换默认产品或发布 npm 包。
+
+后端阶段与能力清单由 [plan-independent-webui](https://github.com/mapleluvr/pakka/tree/pakka/independent-webui-seams/openspec/changes/plan-independent-webui)管理。源码、开发制品、正式发布和产品验收分别记录，不因建仓、构建或提交完成而勾选后续产品任务。

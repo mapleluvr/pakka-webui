@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "src/sdk",
+    "outDir": "dist/sdk"
+  },
+  "include": ["src/sdk/**/*.ts", "src/sdk/**/*.tsx"]
+}
