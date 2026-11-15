@@ -22,7 +22,7 @@
 
 上述浏览器/模型接缝推理请求为 0。零请求只支持无额外推理判断；按钮、modal、焦点和卸载结果分别取证。前置 runtime 元数据拒绝验证了检查原语，不证明真实插件发现/registry 已形成。
 
-## 后续差距
+## 初始候选的后续差距
 
 完整应用入口、开发服务器、Pakka 接入层、registry/资源视图、真实业务插件、模型/Thinking 双入口和参数触控页面由后续任务承接。后端阶段 1 的 3.2 仍缺未加载原 Session 的公开只读历史及独立 facet 控制；不自动 reopen writer 或私读 SQLite。
 
@@ -31,3 +31,11 @@ Provider `/login`、完整 worker/缓存更新、默认切换、npm 发布和合
 ## 本地保全
 
 完整本地证据包：`pakka-webui-phase-1-evidence.zip`，1881349 字节，SHA-256 `c2d710edde0bd38de65811163e009f96d23d64b0b9fb0719f5dec2fa75e35fa3`。只提交候选、关键结果、限制和整体包 hash；原始截图、日志、依赖树、清单与包本体不提交或上传 GitHub。后端及本仓使用同一包身份，具体命令/结果在本地保全。
+
+## 只读历史服务配对补充
+
+2026-11-15，以本仓 `12b282b` 为输入。共享 runtime 的服务要求从 API 1 调整为 API 2，以消费 Pakka 新增的已知未加载原 Session 历史/正文形状；workbench、extension、UI SDK 与 renderer 各自版本不变。
+
+`npm run check`、`npm run build` 通过。新 manifest SHA-256 为 `e72cd6542daf11ab15f943ad31540c35596031131059647f76bfbf2a3d80f33a`；除服务要求外，210 个映射、634 个文件、CSS 与 runtime 元数据和前一候选相同。固定 SDK/client 再次在仓库外独立安装、严格类型检查和浏览器打包通过；安装版 Pakka 的真实启动检查接受 API 2 制品并提供声明 HTML/JS/CSS，明确拒绝 API 1 制品。
+
+本次没有重跑 GUI 交互，也没有历史浏览界面；共享组件字节一致不替代新增产品场景验收。Pakka 已接通公开 reader 与受权读取，阶段 1 的独立 facet 控制仍未完成。原始失败、上游声明/Windows 路径限制及本次完整本地证据包身份统一见 [Pakka 只读历史核对](https://github.com/mapleluvr/pakka/blob/pakka/independent-webui-seams/docs/verification/READONLY-SQLITE-HISTORY.md)；上述初始证据包及其结果不变。

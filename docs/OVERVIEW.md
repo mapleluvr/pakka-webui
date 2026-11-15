@@ -12,7 +12,7 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI stat
 
 ## 下一步与阻塞
 
-- Pakka 的阶段 1 任务 3.2 仍未完成：未加载原 Session 缺公开只读历史来源，独立分 facet 控制未形成。已加载资源的身份/权限解析、完整资产身份与 reconnect 不代替这两项能力。
+- Pakka 已为已知未加载原 Session 接入公开只读 SDK 与受权历史/正文服务，不重开 writer；阶段 1 任务 3.2 仍缺独立分 facet 控制。新候选使用 services API 2，共享 runtime manifest 同步声明该要求；workbench、extension 与 UI SDK/renderer 版本各自不变。它们不代替本仓的实际历史浏览界面。
 - 阶段 2 形成真实应用壳层与 registry、纯 UI 插件和新 SDK 业务插件、模型/Thinking 双入口、参数编辑及跨 Session 原历史消费。
 - 开发服务器需提供与开发 JSX emission 匹配的共享 runtime，不能混用当前 production runtime 或引入第二份 React。
 - Provider `/login` 继续按 roadmap 延期；不为本轮准备 API key/OAuth 交互，不切换默认产品或发布 npm 包。

@@ -93,6 +93,8 @@ export const plugin = defineUiPlugin({
 
 共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。此构建的 `entry` 是 `null`，`workers` 是空数组；完整应用还需把 HTML/入口、页面和实际 worker 纳入自己的 manifest。
 
+当前开发制品要求的服务组合为 workbench 2、extensions 2、services 2；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
+
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 
 静态自定义主题沿上游 `astryx theme build` 生成 CSS 与 built object。当前严格 `style-src 'self'` 会拦截未构建 Theme 的 inline style；运行时主题编辑需要另行形成 CSP 接缝。组件、自定义 React 内容、普通 HTML/CSS/SVG 和有实际用途的局部静态主题不因此受限，也不通过手工写 `__built` 或放宽 `unsafe-inline` 绕过校验。

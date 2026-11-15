@@ -21,3 +21,9 @@
 已运行独立源码/构建、固定 SDK 干净安装与真实浏览器共享 context/portal/CSP/focus/卸载检查，见[固定结果](../verification/INDEPENDENT-SEAMS.md)。这些开发接缝不代替完整应用/registry、新 SDK 业务插件、模型双入口与跨 Session 原历史验收。Pakka 已核对：当前 Durable SQLite 初始化不是只读打开；缺少符合所有权边界的来源时必须明确报告，不能通过私读库或自动 reopen 通过浏览场景。
 
 本轮不切换默认发行、不实现完整页面、不增加 Provider /login、不发布 npm 包或合并。原始结果保存在本地忽略目录；交付时记录实际候选、检查范围、限制与证据包 hash。
+
+## 只读历史服务配对
+
+2026-11-15，Pakka 增补原生只读 SDK 和已知未加载来源的受权历史服务，并将未合并的 services API 从 1 调整为 2。本仓共享 runtime manifest 同步要求 services 2；SDK、renderer、workbench 和 extension 版本不变。这是固定服务组合的显式调整，不是前端读取数据库或迁移旧 UI。
+
+本仓仅改变服务要求元数据并更新开发说明。类型/构建和固定文件身份检查通过，634 个共享文件及 210 个公开映射与原浏览器候选相同；安装版 Pakka 通过真实启动路径接受 API 2 制品、拒绝 API 1 制品。结果见[配对补充](../verification/INDEPENDENT-SEAMS.md#只读历史服务配对补充)。完整历史界面及独立 facet 控制各自仍未完成。
