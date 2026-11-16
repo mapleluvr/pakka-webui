@@ -1,0 +1,9 @@
+[
+  {
+    "package": "@astryxdesign/core",
+    "version": "0.7.15",
+    "entry": "@astryxdesign/core/Layer",
+    "purpose": "Static CSS anchor-position fallback rules emitted by the public Layer runtime",
+    "sha256": "fe2dbe555b76aa8561d0083d396c3273de7ddc3099798180bfa4a58aa55b85e6"
+  }
+]

@@ -1,20 +1,18 @@
 # 工作入口
 
-Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI state](state/webui.md)，现有源码与构建入口见 [UI SDK](development/UI-SDK.md)及 [README](../README.md)。
+Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI state](state/webui.md)，运行入口见 [README](../README.md)与[应用开发](development/APPLICATION.md)，插件公开能力见 [UI SDK](development/UI-SDK.md)。
 
 ## 当前状态
 
-本仓从初始化基线 0ee6bdc 开始形成新的纯浏览器 `@pakka/webui-sdk`，不以旧 Preact 产物为架构模板。当前已有贡献/资源/命令声明、单实例与 WebUI publication 实例集合生命周期、共享 React context 和共同构建的 React/Astryx/主题/CSS runtime；Pakka 协议、服务客户端、模型配置和 Node 资产读取由后端仓库维护。
+阶段 1 的独立 SDK、只读历史和逐 facet 接缝已经验收。阶段 2 候选形成独立应用与同源开发环境、通用 registry、GUI-only 示例、跨 Session 原历史浏览、模型/Thinking 双入口、实例连接和 Person 默认值设置，以及由 RSI 包提供的 React/Astryx 工单切片。
 
-已运行仓库外干净安装/类型/构建及真实浏览器消费：插件与宿主共享 React、SDK/Astryx context 和 portal；静态主题符合现有 CSP，Dialog/focus 与实例卸载清理成立。结果限定于开发接缝，不等于完整应用或业务插件验收，见[接缝记录](changes/independent-seams.md)。
+当前组合为 services 3 / extensions 3 / workbench 2、资产 schema 2；完整应用的 `dist/app` 有 HTML entry，共享 runtime 的 entry 仍为 null。后端提供固定 manifest 入口，默认产品尚未切换。具体检查、失败复验和制品身份见[阶段 2 核对](verification/PHASE-2.md)，形成过程见[独立应用记录](changes/independent-application.md)。
 
-完整前端入口、开发服务器、Pakka 应用接入层、Conversation 与参数编辑页面尚未形成。共享 runtime manifest 的 entry 为 null、workers 为空，不能直接作为完整 WebUI 启动。
+## 后续工作
 
-## 下一步与阻塞
+- 阶段 3 收口两仓交付、支持组合与跨候选兼容验证。独立仓库和固定制品入口已经存在，但不据此将整阶段记为完成。
+- 阶段 4 补齐完整 Conversation、事件观察、设置与其余插件。普通输入丢响应后保留原 requestId 并阻止重发，公共输入回执查询仍是明确缺口；模型设置和 RSI 已有各自的原请求核对。
+- Provider `/login` 继续按 roadmap 延期。完整功能迁移、默认产品切换、npm 发布和合并分别授权与验收。
+- Windows 长路径下旧私密文件 ACL helper 与上游 Node 依赖声明限制保留在核对记录，不通过放宽权限或 `skipLibCheck` 掩盖。
 
-- 阶段 1 已接通独立 facet 控制、已知未加载原 Session 的受权只读历史、模型配置与固定制品。新组合为 services 3 / extensions 3 / workbench 2；[facet 核对](verification/FACET-CONTROL.md)记录真实浏览器、安装和保留限制。它们不代替本仓的实际历史浏览界面。
-- 阶段 2 形成真实应用壳层与 registry、纯 UI 插件和新 SDK 业务插件、模型/Thinking 双入口、参数编辑及跨 Session 原历史消费。
-- 开发服务器的 JSX emission 与共享 runtime 必须匹配；生产 runtime 消费 production JSX，采用 development JSX 时须提供同一份 React 的对应开发组合。
-- Provider `/login` 继续按 roadmap 延期；不为本轮准备 API key/OAuth 交互，不切换默认产品或发布 npm 包。
-
-后端阶段与能力清单由 [plan-independent-webui](https://github.com/mapleluvr/pakka/tree/pakka/independent-webui-seams/openspec/changes/plan-independent-webui)管理。源码、开发制品、正式发布和产品验收分别记录，不因建仓、构建或提交完成而勾选后续产品任务。
+后端阶段与能力清单由 [plan-independent-webui](https://github.com/mapleluvr/pakka/tree/pakka/independent-webui-seams/openspec/changes/plan-independent-webui)管理。

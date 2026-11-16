@@ -1,4 +1,8 @@
 import { build } from "esbuild";
+import {
+  WEBUI_ASSET_SCHEMA,
+  decodeWebUiInlineStyleHashes,
+} from "@pakka/protocol/webui-assets";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -31,6 +35,23 @@ const metadata = new Map(
   ),
 );
 const own = await readJson(join(root, "package.json"));
+// The allowlist is captured from the pinned public runtime, not generated from
+// arbitrary styles observed at application startup. An upstream upgrade needs review.
+const stylePolicy = await readJson(
+  join(root, "scripts/runtime-style-hashes.json"),
+);
+if (
+  !Array.isArray(stylePolicy) ||
+  stylePolicy.some(
+    (rule) => metadata.get(rule.package)?.version !== rule.version,
+  )
+)
+  throw new Error(
+    "Runtime style policy requires review for this package version",
+  );
+const inlineStyleHashes = decodeWebUiInlineStyleHashes(
+  stylePolicy.map((rule) => rule.sha256),
+);
 const entries = new Map();
 const bridges = new Map();
 
@@ -235,7 +256,8 @@ for (const [index, specifier] of keys.entries()) {
   imports[specifier] = prefix + file.path;
 }
 const manifest = {
-  schema: 1,
+  schema: WEBUI_ASSET_SCHEMA,
+  inlineStyleHashes,
   requires: { services: 3, workbench: 2, extensions: 3 },
   runtime: {
     id: "react19-astryx0.7.15",

@@ -2,16 +2,18 @@
 
 ## 按职责找代码
 
-| 位置                        | 责任                                                           |
-| --------------------------- | -------------------------------------------------------------- |
-| `src/sdk/contracts.ts`      | 通用贡献、资源引用、命令、实例与显式服务 bindings 的公共类型   |
-| `src/sdk/index.ts`          | 插件声明与 runtime 需求检查；没有服务连接或应用启动副作用      |
-| `src/sdk/react.tsx`         | 宿主与插件共用的 `UiContextProvider` / `useUiContext`          |
-| `src/host/lifetime.ts`      | 单个 UI 实例的 signal、清理和过期调用拒绝                      |
-| `src/host/facet.ts`         | 同一 WebUI publication 的实例集合、替换清理与失败保留          |
-| `scripts/build-runtime.mjs` | 从上游公开 exports 构建一张共享浏览器模块图及固定资产 manifest |
+| 位置                                       | 责任                                                           |
+| ------------------------------------------ | -------------------------------------------------------------- |
+| `src/sdk/contracts.ts`                     | 通用贡献、资源引用、命令、实例与显式服务 bindings 的公共类型   |
+| `src/sdk/index.ts`                         | 插件声明与 runtime 需求检查；没有服务连接或应用启动副作用      |
+| `src/sdk/react.tsx`                        | 宿主与插件共用的 `UiContextProvider` / `useUiContext`          |
+| `src/host/lifetime.ts`                     | 单个 UI 实例的 signal、清理和过期调用拒绝                      |
+| `src/host/facet.ts`                        | 同一 WebUI publication 的实例集合、替换清理与失败保留          |
+| `src/host/registry.ts`、`InstanceView.tsx` | 贡献注册、实例渲染、命令与资源视图；由应用显式注入服务         |
+| `src/integrations/pakka/extensions.ts`     | 获准插件的固定资产装载与 Backend 服务绑定                      |
+| `scripts/build-runtime.mjs`                | 从上游公开 exports 构建一张共享浏览器模块图及固定资产 manifest |
 
-这些是已经存在的入口。应用壳层、完整插件 registry、Pakka 接入层和功能页面由后续真实消费者形成，不要求先建空目录或给每层增加转导出。
+应用入口、开发服务器和实际功能切片见[应用开发](APPLICATION.md)。这些目录由实际消费者形成，各层保持直接入口，无需增加没有用途的转导出。
 
 ## 一个纯 UI 插件
 
@@ -62,7 +64,7 @@ export const plugin = defineUiPlugin({
 
 `UiContext` 提供 `notice`、`open`、`navigate`、`dispatch`、`close` 和 `onDispose`。资源解析结果区分 ready、unloaded、unavailable、forbidden、identity-mismatch、unsupported；宿主不从 opaque id 猜测数据库路径或 Pakka URL。Pakka 接入层将自己的 typed Session/Conversation 引用交给公开服务，再适配到 UI 来源。
 
-当前 SDK 声明了命名空间命令；应用的键盘、slash 解析和模型悬浮窗尚未实现。它们共享业务操作，但不因此成为 SDK 内置的模型命令。
+应用 registry 实现命名空间命令；Conversation 输入的模型/Thinking 与 extension slash 解析属于各功能及 Pakka 接入层。它们调用相同业务操作，不成为 UI SDK 内置的模型命令。未启用、歧义或尚未接入的已声明 extension 命令会明确拒绝，不作为普通模型消息提交。
 
 ## 实例与服务的生命周期
 
@@ -80,7 +82,7 @@ Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；B
 
 当前共享组合由锁文件固定：React/ReactDOM 19.3.1、Astryx Core 与 Neutral 0.7.15、StyleX runtime 0.19.2。SDK 的接口版本是 `api: 1`，runtime id 为 `react19-astryx0.7.15`；它们不是服务 API 或文件 hash。
 
-当前 runtime 构建使用 production React。插件的 JSX 构建应使用 production `react/jsx-runtime`；不能把 development JSX emission 与这份生产 runtime 混用。上游在 production 下的 `react/jsx-dev-runtime` 不提供可调用的 jsxDEV，独立开发服务器须在阶段 2 提供相应开发组合，而不是把它 alias 到另一个 React。
+当前共享运行时、应用开发和插件构建都使用 production React 与 `react/jsx-runtime`，开发服务器采用完整重载。不能把 development JSX emission 与这份 runtime 混用；上游 production `react/jsx-dev-runtime` 不提供可调用的 jsxDEV。需要 development 模式时，应整体构建匹配的共享组合。
 
 三件事分别成立：
 
@@ -96,12 +98,12 @@ Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；B
 
 ## 静态资产与主题
 
-共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。此构建的 `entry` 是 `null`，`workers` 是空数组；完整应用还需把 HTML/入口、页面和实际 worker 纳入自己的 manifest。
+共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。当前两份 manifest 的 `workers` 均为空。
 
 当前开发制品要求的服务组合为 workbench 2、extensions 3、services 3；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
 
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 
-静态自定义主题沿上游 `astryx theme build` 生成 CSS 与 built object。当前严格 `style-src 'self'` 会拦截未构建 Theme 的 inline style；运行时主题编辑需要另行形成 CSP 接缝。组件、自定义 React 内容、普通 HTML/CSS/SVG 和有实际用途的局部静态主题不因此受限，也不通过手工写 `__built` 或放宽 `unsafe-inline` 绕过校验。
+静态自定义主题沿上游 `astryx theme build` 生成 CSS 与 built object。CSP 仅许可同源静态 CSS 与固定制品声明的精确样式 hash；当前仅为固定 Astryx Layer 文本提供该许可，未构建 Theme 的任意 inline 注入仍被拒绝。运行时主题编辑需要另行形成 CSP 接缝。组件、自定义 React 内容、普通 HTML/CSS/SVG 和有实际用途的局部静态主题保持可组合性。
 
 后端消费的是固定字节与 manifest digest，而不是组件树。完整应用制品须声明 HTML entry；宿主对兼容需求、文件、路径及内容身份的核对失败时，不启动替代前端。开发制品渠道、实际结果与剩余范围见[接缝记录](../changes/independent-seams.md)。
