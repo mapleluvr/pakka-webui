@@ -25,6 +25,14 @@ npm run build
 
 默认主题消费上游预构建 `@astryxdesign/theme-neutral/built` 与静态 CSS，使用其支持的系统字体 fallback，不自动访问远程字体服务。自定义静态主题使用上游 theme build 流程；未构建主题的运行时样式注入不适用于当前严格 CSP。
 
+## 应用交付
+
+```sh
+npm run pack:app -- dist/delivery-candidate
+```
+
+目标目录必须是新目录；命令构建完整应用，再通过 npm pack 输出固定内容 hash 的静态 tgz 与 `app-release.json`。归档包含 manifest 声明的资产、上游许可和私有 npm 元数据，不带后端依赖。Pakka 按获准的归档/manifest 摘要显式装配；SDK 仍单独交付，默认产品切换另行处理。详见[交付与配对](docs/development/DELIVERY.md)。
+
 ## 本地开发
 
 ```sh

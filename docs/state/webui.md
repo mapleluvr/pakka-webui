@@ -8,6 +8,8 @@ Pakka WebUI 是采用 React 19、TypeScript/TSX 与 Astryx 的独立浏览器应
 
 服务面使用 `/pakka-webui` 命名空间，由 Pakka 接入层消费。首版独立开发通过同源代理联调，维持 Host/Origin、Cookie/CSRF 和明确的代理边界。服务 API、UI SDK/renderer、资产格式与内容身份各自核对兼容性。固定制品的 `inlineStyleHashes` 只声明经核对且绑定依赖版本的静态样式文本；HTTP 以精确 SHA-256 许可保持 CSP，其他 inline 样式继续拒绝。
 
+应用通过标准 npm 静态归档交付，SDK 归档保持独立。完整归档包含 manifest 声明资产、上游许可和无运行依赖的私有 npm 元数据；现有交付不覆盖，元数据路径不与资产冲突。消费方从可信配对记录取得预期归档和 manifest 摘要，在 Session 打开前核对格式、协议与实际字节。切换固定前端遵循正常停止和原 Session 重开流程，UI 回退不回滚数据库或删除待核对操作。
+
 ## 职责与依赖
 
 源码按实际实现需要形成以下职责目录，目录不等于独立 package：

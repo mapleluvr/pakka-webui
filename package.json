@@ -27,6 +27,7 @@
     "build:runtime": "node scripts/build-runtime.mjs",
     "build:app": "node scripts/build-app.mjs",
     "build": "npm run build:sdk && npm run build:runtime && npm run build:app",
+    "pack:app": "npm run build && node scripts/pack-app.mjs",
     "dev": "npm run build && node scripts/dev.mjs",
     "format:check": "prettier --check src scripts docs README.md AGENTS.md *.json"
   },
