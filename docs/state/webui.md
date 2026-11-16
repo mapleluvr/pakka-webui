@@ -30,7 +30,8 @@ host 消费显式注入的贡献、解析器和能力；Pakka URL 与服务实�
 - 插件可以提供导航、page、sheet/panel、设置与完整自定义 React 内容，并直接使用 Astryx 的公开组件、parts、hooks、props 和类型。
 - 宿主与插件共享 React/ReactDOM/JSX、Astryx 及所需 StyleX runtime、主题和浮层环境。普通 HTML、局部 CSS/SVG、自定义组件与有实际用途的局部主题可组合。
 - 贡献声明、服务调用、命名空间命令和有限观察走公开接口。服务绑定承担 actor/resource 授权；界面容器承担打开、关闭、焦点、错误和清理。
-- 实例绑定插件身份、版本/generation、资源与 open-instance。替换时清理旧订阅、监听、计时器与可中止读取；UI、Backend、Agent 的启停分别表达，已接纳工作由所属服务接续。
+- 每个 facet 具有独立的 version、generation 和 phase；服务调用、资产和控制按对应 facet 身份接线。WebUI publication 拥有其实例集合；Backend/Client/Agent 的状态变化各自处理。
+- 实例绑定插件身份、版本/generation、资源与 open-instance。替换时清理所属订阅、监听、计时器与可中止读取，旧实例的结果不能进入新实例。清理失败保留并报告同一次结果；已接纳工作由所属服务接续。
 
 ## 资源与持久效果
 

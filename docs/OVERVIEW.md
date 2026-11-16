@@ -4,7 +4,7 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI stat
 
 ## 当前状态
 
-本仓从初始化基线 0ee6bdc 开始形成新的纯浏览器 `@pakka/webui-sdk`，不以旧 Preact 产物为架构模板。当前已有贡献/资源/命令声明、单个 UI 实例生命周期、共享 React context 和共同构建的 React/Astryx/主题/CSS runtime；Pakka 协议、服务客户端、模型配置和 Node 资产读取由后端仓库维护。
+本仓从初始化基线 0ee6bdc 开始形成新的纯浏览器 `@pakka/webui-sdk`，不以旧 Preact 产物为架构模板。当前已有贡献/资源/命令声明、单实例与 WebUI publication 实例集合生命周期、共享 React context 和共同构建的 React/Astryx/主题/CSS runtime；Pakka 协议、服务客户端、模型配置和 Node 资产读取由后端仓库维护。
 
 已运行仓库外干净安装/类型/构建及真实浏览器消费：插件与宿主共享 React、SDK/Astryx context 和 portal；静态主题符合现有 CSP，Dialog/focus 与实例卸载清理成立。结果限定于开发接缝，不等于完整应用或业务插件验收，见[接缝记录](changes/independent-seams.md)。
 
@@ -12,9 +12,9 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的目标见 [WebUI stat
 
 ## 下一步与阻塞
 
-- Pakka 已为已知未加载原 Session 接入公开只读 SDK 与受权历史/正文服务，不重开 writer；阶段 1 任务 3.2 仍缺独立分 facet 控制。新候选使用 services API 2，共享 runtime manifest 同步声明该要求；workbench、extension 与 UI SDK/renderer 版本各自不变。它们不代替本仓的实际历史浏览界面。
+- 阶段 1 已接通独立 facet 控制、已知未加载原 Session 的受权只读历史、模型配置与固定制品。新组合为 services 3 / extensions 3 / workbench 2；[facet 核对](verification/FACET-CONTROL.md)记录真实浏览器、安装和保留限制。它们不代替本仓的实际历史浏览界面。
 - 阶段 2 形成真实应用壳层与 registry、纯 UI 插件和新 SDK 业务插件、模型/Thinking 双入口、参数编辑及跨 Session 原历史消费。
-- 开发服务器需提供与开发 JSX emission 匹配的共享 runtime，不能混用当前 production runtime 或引入第二份 React。
+- 开发服务器的 JSX emission 与共享 runtime 必须匹配；生产 runtime 消费 production JSX，采用 development JSX 时须提供同一份 React 的对应开发组合。
 - Provider `/login` 继续按 roadmap 延期；不为本轮准备 API key/OAuth 交互，不切换默认产品或发布 npm 包。
 
 后端阶段与能力清单由 [plan-independent-webui](https://github.com/mapleluvr/pakka/tree/pakka/independent-webui-seams/openspec/changes/plan-independent-webui)管理。源码、开发制品、正式发布和产品验收分别记录，不因建仓、构建或提交完成而勾选后续产品任务。

@@ -236,7 +236,7 @@ for (const [index, specifier] of keys.entries()) {
 }
 const manifest = {
   schema: 1,
-  requires: { services: 2, workbench: 2, extensions: 2 },
+  requires: { services: 3, workbench: 2, extensions: 3 },
   runtime: {
     id: "react19-astryx0.7.15",
     sdk: own.version,

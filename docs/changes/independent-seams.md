@@ -26,4 +26,10 @@
 
 2026-11-15，Pakka 增补原生只读 SDK 和已知未加载来源的受权历史服务，并将未合并的 services API 从 1 调整为 2。本仓共享 runtime manifest 同步要求 services 2；SDK、renderer、workbench 和 extension 版本不变。这是固定服务组合的显式调整，不是前端读取数据库或迁移旧 UI。
 
-本仓仅改变服务要求元数据并更新开发说明。类型/构建和固定文件身份检查通过，634 个共享文件及 210 个公开映射与原浏览器候选相同；安装版 Pakka 通过真实启动路径接受 API 2 制品、拒绝 API 1 制品。结果见[配对补充](../verification/INDEPENDENT-SEAMS.md#只读历史服务配对补充)。完整历史界面及独立 facet 控制各自仍未完成。
+本仓仅改变服务要求元数据并更新开发说明。类型/构建和固定文件身份检查通过，634 个共享文件及 210 个公开映射与原浏览器候选相同；安装版 Pakka 通过真实启动路径接受 API 2 制品、拒绝 API 1 制品。结果见[配对补充](../verification/INDEPENDENT-SEAMS.md#只读历史服务配对补充)。该次配对没有实现完整历史界面或独立 facet 控制。
+
+## 独立 facet 控制配对
+
+2026-11-16，按用户授权完成 WebUI publication 的实例集合与清理接缝，公开服务/extension 显式升级为 3，workbench 保持 2。Backend/Client 的控制不卸载 UI；一个 UI publication 的禁用/替换只清理其实例，保留其他 publication。重复清理保留原结果，旧实例不能删除同名新实例或发布晚到结果。
+
+通过真实安装产品、共享 React/Astryx、Cookie/CSRF、原写入回执、Dialog/portal/focus 与四个实例的清理检查；独占回环 origin 隔离验证 Cookie。具体候选、实际结果和限制见[独立 facet 记录](../verification/FACET-CONTROL.md)。用户要求阶段 1 验收后进入阶段 2，完整应用入口/registry、RSI 与模型和历史切片由后续工作形成。

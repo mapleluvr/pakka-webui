@@ -8,6 +8,7 @@
 | `src/sdk/index.ts`          | 插件声明与 runtime 需求检查；没有服务连接或应用启动副作用      |
 | `src/sdk/react.tsx`         | 宿主与插件共用的 `UiContextProvider` / `useUiContext`          |
 | `src/host/lifetime.ts`      | 单个 UI 实例的 signal、清理和过期调用拒绝                      |
+| `src/host/facet.ts`         | 同一 WebUI publication 的实例集合、替换清理与失败保留          |
 | `scripts/build-runtime.mjs` | 从上游公开 exports 构建一张共享浏览器模块图及固定资产 manifest |
 
 这些是已经存在的入口。应用壳层、完整插件 registry、Pakka 接入层和功能页面由后续真实消费者形成，不要求先建空目录或给每层增加转导出。
@@ -69,6 +70,10 @@ export const plugin = defineUiPlugin({
 
 `onDispose` 用于订阅、监听、计时器和其他实例资源。正常 React effect 卸载可注销其清理注册；已经 dispose 的实例立即执行新注册的清理。错误被汇总报告，不跳过余下清理。
 
+`createUiFacet({ pluginId, generation }, ports)` 是宿主内部的 publication 集合，不新增 SDK public export。create 为该 generation 建立实例；禁用/替换时 dispose 先封闭接纳，再逐个清理全部实例。清理失败仍执行其余清理并保留错误，重复调用不重做清理或改报成功。单个实例成功关闭后可重开同名实例，但旧 wrapper 的清理不能移除新实例，也不能继承新实例的错误。
+
+Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；Backend、Agent、Client 的独立变更不关闭它。宿主集合本身不解析服务 URL、不轮询后端，也不管理持久任务。晚到异步结果仍须核对旧 signal 与 owner，不能向替代实例发布。
+
 这些行为只属于 UI。业务调用、持久回执和 Backend/Agent 的停启由服务绑定处理；界面关闭不取消已接纳工作。`clickAction` 或 UI loading 结束也不证明持久写入完成。丢响应后使用所属服务的原请求查询，不能换 requestId 重提。
 
 ## 依赖、external 和浏览器解析
@@ -93,7 +98,7 @@ export const plugin = defineUiPlugin({
 
 共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。此构建的 `entry` 是 `null`，`workers` 是空数组；完整应用还需把 HTML/入口、页面和实际 worker 纳入自己的 manifest。
 
-当前开发制品要求的服务组合为 workbench 2、extensions 2、services 2；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
+当前开发制品要求的服务组合为 workbench 2、extensions 3、services 3；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
 
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 
