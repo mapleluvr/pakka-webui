@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import type {
-  AgentRef,
-  PocketConfiguration,
-  PocketConfigurationChange,
+import {
+  PocketRemoteError,
+  type AgentRef,
+  type PocketConfigurationChange,
 } from "@pakka/client/pocket";
-import type { ModelCatalogItem } from "@pakka/protocol/webui";
+import {
+  decodeConversationConfigurationRequest,
+  type ConversationConfigurationRequest,
+  type ConversationConfigurationSelection,
+  type ConversationConfigurationView,
+  type ModelCatalogItem,
+} from "@pakka/protocol/webui";
 import type { UiContext } from "@pakka/webui-sdk";
+import {
+  claimPending,
+  clearPending,
+  readPending,
+} from "../../integrations/pakka/pending.js";
 import {
   describeFailure,
   requestSignal,
@@ -13,40 +24,58 @@ import {
 } from "../../integrations/pakka/connection.js";
 import { exactModel } from "./ModelPicker.js";
 
-/** Read current state after a change; an unconfirmed change is never retried by this hook. */
+/** The original receipt proves the change; current configuration is read separately. */
 export function useConversationConfiguration(
   ui: UiContext,
   connection: PakkaConnection,
   target: AgentRef,
+  changed: () => void,
 ) {
-  const [configuration, setConfiguration] =
-    useState<PocketConfiguration | null>(null);
+  const key = JSON.stringify([
+    "pakka-conversation-configuration",
+    connection.origin,
+    connection.person.id,
+    target.sessionId,
+    target.conversationId,
+  ]);
+  function decode(value: unknown) {
+    const original = decodeConversationConfigurationRequest(value);
+    if (
+      original.target.sessionId !== target.sessionId ||
+      original.target.conversationId !== target.conversationId
+    )
+      throw new Error("配置原请求不属于此 Conversation。");
+    return original;
+  }
+  const [view, setView] = useState<ConversationConfigurationView | null>(null);
+  const [pending, setPending] = useState(() => readPending(key, decode));
   const [model, setModel] = useState<ModelCatalogItem | null>(null);
   const [busy, setBusy] = useState(false);
-  const [unconfirmed, setUnconfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const admission = useRef(false);
   const current = useRef(target);
+  const readRevision = useRef(0);
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
   async function read(ref: AgentRef, signal: AbortSignal) {
-    const result = await connection.workbench.request(
-      { op: "configuration", target: ref },
+    const revision = ++readRevision.current;
+    const result = await connection.services.request(
+      { op: "conversation-configuration.read", target: ref },
       { signal },
     );
-    if (result.kind !== "configuration")
-      throw new Error("配置读取未得到确认。");
-    if (signal.aborted) return;
-    current.current = result.configuration.ref;
-    setConfiguration(result.configuration);
-    const key = result.configuration.current?.model;
+    if (signal.aborted || revision !== readRevision.current) return;
+    current.current = result.view.configuration.ref;
+    setView(result.view);
+    setModel(null);
+    const selected = result.view.configuration.current?.model;
     let item: ModelCatalogItem | null = null;
-    if (key)
+    if (selected) {
       try {
-        item = await exactModel(connection, key, signal);
+        item = await exactModel(connection, selected, signal);
       } catch {
-        /* Current configuration remains authoritative when the catalog is unavailable. */
+        /* Configuration remains authoritative when the optional model catalog is unavailable. */
       }
-    if (!signal.aborted) setModel(item);
+    }
+    if (!signal.aborted && revision === readRevision.current) setModel(item);
   }
   useEffect(() => {
     const controller = new AbortController();
@@ -54,88 +83,126 @@ export function useConversationConfiguration(
       controller.signal,
       requestSignal(ui.signal, connection),
     ]);
+    setView(null);
+    setModel(null);
     void read(target, signal).catch((reason) => {
       if (!signal.aborted) setError(describeFailure(reason));
     });
     return () => controller.abort();
   }, [target, connection, ui]);
-  async function configure(
-    change: PocketConfigurationChange,
+  async function refresh(signal: AbortSignal) {
+    const { resolution } = await connection.services.request(
+      {
+        op: "resource.resolve",
+        reference: {
+          kind: "conversation",
+          sessionId: target.sessionId,
+          conversationId: target.conversationId,
+        },
+      },
+      { signal },
+    );
+    if (resolution.status !== "loaded")
+      throw new Error("原 Conversation 当前未加载。");
+    await read(resolution.target, signal);
+  }
+  async function run(
+    selection?: ConversationConfigurationSelection,
   ): Promise<boolean> {
-    if (admission.current || unconfirmed || !alive()) return false;
-    if (!configuration?.canConfigure) {
-      setError("当前身份不能配置此 Conversation。");
+    if (admission.current || !alive()) return false;
+    if (
+      selection &&
+      (!view?.configuration.canConfigure || !view.supportsRequests)
+    ) {
+      setError("当前来源或身份不支持配置变更。");
       return false;
     }
     admission.current = true;
     setBusy(true);
     setError(null);
     const signal = requestSignal(ui.signal, connection);
+    let request: ConversationConfigurationRequest | undefined;
     let confirmed = false;
     try {
-      const result = await connection.workbench.request(
-        { op: "configure.agent", target: current.current, change },
-        { signal, requestId: crypto.randomUUID() },
-      );
-      if (result.kind !== "reference") throw new Error("配置结果未得到确认。");
-      current.current = result.ref;
+      request = selection
+        ? decode({
+            requestId: crypto.randomUUID(),
+            target: current.current,
+            selection,
+          })
+        : undefined;
+      const original = request
+        ? claimPending(key, request, decode)
+        : readPending(key, decode);
+      setPending(original);
+      if (original === "unreadable") return false;
+      if (!original) {
+        await refresh(signal);
+        return false;
+      }
+      if (request && original.requestId !== request.requestId) {
+        setError("此 Conversation 已有配置待核对，本次没有提交。");
+        return false;
+      }
+      const result = request
+        ? await connection.services.request(
+            { op: "conversation-configuration.write", change: original },
+            { signal },
+          )
+        : await connection.services.request(
+            { op: "conversation-configuration.lookup", original },
+            { signal },
+          );
+      if (!result.receipt) {
+        if (alive())
+          setError("尚未找到原配置回执，原请求继续保留，不能重复保存。");
+        return false;
+      }
       confirmed = true;
-      await read(result.ref, signal);
+      const remaining = clearPending(key, original.requestId, decode);
+      if (alive()) setPending(remaining);
+      await refresh(signal);
+      if (alive()) changed();
       return !signal.aborted;
     } catch (reason) {
-      if (alive()) {
+      if (
+        !confirmed &&
+        request &&
+        reason instanceof PocketRemoteError &&
+        reason.outcome === "denied"
+      ) {
+        try {
+          const remaining = clearPending(key, request.requestId, decode);
+          if (alive()) setPending(remaining);
+        } catch {
+          /* Keep the original if local acknowledgement fails. */
+        }
+      }
+      if (alive())
         setError(
           confirmed
-            ? `配置已保存，当前显示尚未刷新。${describeFailure(reason)}`
+            ? `配置已确认保存，当前显示尚未刷新。${describeFailure(reason)}`
             : describeFailure(reason),
         );
-        setUnconfirmed(true);
-      }
-      return false;
-    } finally {
-      admission.current = false;
-      if (alive()) setBusy(false);
-    }
-  }
-  async function reconcile() {
-    if (admission.current || !alive()) return;
-    admission.current = true;
-    setBusy(true);
-    const signal = requestSignal(ui.signal, connection);
-    try {
-      const { resolution } = await connection.services.request(
-        {
-          op: "resource.resolve",
-          reference: {
-            kind: "conversation",
-            sessionId: target.sessionId,
-            conversationId: target.conversationId,
-          },
-        },
-        { signal },
-      );
-      if (resolution.status !== "loaded")
-        throw new Error("原 Conversation 当前未加载。");
-      await read(resolution.target, signal);
-      if (!signal.aborted) {
-        setUnconfirmed(false);
-        setError("已读取当前配置；此前未确认请求的结果仍未知。");
-      }
-    } catch (reason) {
-      if (alive()) setError(describeFailure(reason));
+      return confirmed && !signal.aborted;
     } finally {
       admission.current = false;
       if (alive()) setBusy(false);
     }
   }
   return {
-    configuration,
+    configuration: view?.configuration ?? null,
+    presets: view?.presets ?? [],
+    supportsRequests: view?.supportsRequests ?? false,
     model,
+    pending,
     busy,
-    unconfirmed,
+    unconfirmed: !!pending,
     error,
-    configure,
-    reconcile,
+    configure: (change: PocketConfigurationChange) =>
+      run({ kind: "agent", change }),
+    preset: (profile: string) => run({ kind: "profile", profile }),
+    reconcile: () => run(),
     currentTarget: () => current.current,
   };
 }

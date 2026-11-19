@@ -37,12 +37,12 @@ export function usePakkaConnection() {
         const next = await connectPakka(
           location.origin,
           lifetime.signal,
-          () => {
+          (message) => {
             if (!mounted.current || controller.current !== lifetime) return;
             lifetime.abort();
             current.current = null;
             setConnection(null);
-            setError("登录已失效，请重新登录 Pakka。");
+            setError(message ?? "登录已失效，请重新登录 Pakka。");
           },
         );
         if (!mounted.current || lifetime.signal.aborted) return false;

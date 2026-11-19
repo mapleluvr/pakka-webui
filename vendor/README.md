@@ -1,12 +1,12 @@
 # 固定的公开浏览器依赖
 
-当前开发组合使用 Pakka `pakka/independent-webui-seams` 阶段 2 候选（基线 `dfb3837510052a4f725cbc3fa30026093ebea4ad`）构建的公开包。这些是完整包产物；本仓不复制协议源码，也不安装后端执行包。对应源码和核对范围见[阶段 2 记录](../docs/verification/PHASE-2.md)。
+当前应用消费 Pakka `pakka/independent-webui-seams` 的阶段 4 公开协议与客户端归档。组合为 services 4 / workbench 2 / extensions 3，资产 schema 2；固定安装与来源随阶段候选记录核对。这些是完整公开包，前端通过包出口消费。
 
 | 归档                                  | 版本  | SHA-256                                                            |
 | ------------------------------------- | ----- | ------------------------------------------------------------------ |
-| `pakka-client-96236109a3fb92a3.tgz` | 0.1.0 | `96236109a3fb92a39d609c6a1caf6c7b528e18524fb2194a73cc514a92b24994` |
-| `pakka-protocol-c57ec7c43f2d8156.tgz` | 0.1.0 | `c57ec7c43f2d8156648e285bd79acadb52563c5806ae4a163eea49dc094e3033` |
+| `pakka-client-73510b9c9689d6ae.tgz`   | 0.1.0 | `73510b9c9689d6ae4e2d2496e2c0c0e777f820d8f8459d9ca5d1f7795bef86dd` |
+| `pakka-protocol-d17f5af6cd81e18d.tgz` | 0.1.0 | `d17f5af6cd81e18d4bc80c92c2850e0ba0cbf2c26d1fba93cc913e3fd059ead3` |
 
-组合为 services 3 / extensions 3 / workbench 2、资产 schema 2。客户端新增独立 Backend service binding，协议提供固定样式摘要的资产契约。归档以内容身份命名，package-lock 同时锁定完整 integrity；不能原位覆盖已固定的产物。
+归档以内容身份命名，`package-lock.json` 同时锁定完整 integrity。纯 UI SDK 独立于这些应用开发依赖；包版本相同仍须核对精确候选字节。
 
-纯 UI SDK 不依赖这些包；它们仅属于应用构建的开发依赖。包尚未发布 npm，版本相同不代表开发候选字节相同。替换候选时核对来源、hash、锁文件、干净安装及前后端配对。
+阶段 3 的两份已跟踪归档保留历史身份：`pakka-client-96236109a3fb92a3.tgz` 与 `pakka-protocol-c57ec7c43f2d8156.tgz`，对应[阶段 2 公开包记录](../docs/verification/PHASE-2.md)及[阶段 3 应用记录](../docs/verification/PHASE-3.md)。中间未选用的本地归档已移到仓库外保全目录；当前安装仅引用表中的两份归档。

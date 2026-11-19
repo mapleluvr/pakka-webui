@@ -1,0 +1,122 @@
+.human-collaboration {
+  min-width: 0;
+}
+.collaboration-panel {
+  scroll-margin-block: 1rem;
+}
+.collaboration-panel:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
+}
+.collaboration-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.collaboration-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.collaboration-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.5rem;
+}
+.collaboration-columns > section {
+  min-width: 0;
+}
+.collaboration-driver,
+.collaboration-pending {
+  padding: 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: 0.5rem;
+}
+.collaboration-driver .actions > div {
+  max-width: 100%;
+}
+.collaboration-presence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--app-muted);
+}
+.collaboration-filters > :first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.collaboration-checkbox {
+  min-height: 44px;
+  align-self: end;
+}
+.collaboration-message {
+  min-width: 0;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--app-line);
+}
+.collaboration-message time {
+  font-size: 0.8rem;
+}
+.collaboration-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.collaboration-quote {
+  min-width: 0;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--app-line);
+  color: var(--app-muted);
+}
+.collaboration-quote p {
+  max-height: 7rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.collaboration-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.collaboration-reactions > button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.collaboration-reaction-icon {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+.collaboration-icon {
+  width: 24px;
+  height: 24px;
+}
+.collaboration-count {
+  position: absolute;
+  right: -0.5rem;
+  bottom: -0.35rem;
+  min-width: 1rem;
+  padding-inline: 0.15rem;
+  border-radius: 0.5rem;
+  background: var(--app-surface);
+  font-size: 0.65rem;
+  line-height: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.collaboration-pending summary {
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .collaboration-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

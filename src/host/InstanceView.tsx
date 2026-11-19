@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { Dialog } from "@astryxdesign/core/Dialog";
+import { Layout, LayoutContent, LayoutHeader } from "@astryxdesign/core/Layout";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { UiContextProvider } from "@pakka/webui-sdk/react";
@@ -59,39 +60,35 @@ export function InstanceView({
     return (
       <Dialog
         isOpen
+        width={640}
+        maxHeight="90dvh"
         onOpenChange={(value) => {
           if (!value) close();
         }}
         aria-label={view.title}
       >
-        <div className="flow dialog-content">
-          <header className="pane-heading">
-            <h2>{view.title}</h2>
-            <IconButton
-              className="icon-button"
-              label={`关闭${view.title}`}
-              icon={<CloseIcon />}
-              variant="ghost"
-              onClick={close}
-            />
-          </header>
-          {content}
-        </div>
+        <Layout
+          header={
+            <LayoutHeader>
+              <header className="pane-heading">
+                <h2>{view.title}</h2>
+                <IconButton
+                  className="icon-button"
+                  label={`关闭${view.title}`}
+                  icon={<CloseIcon />}
+                  variant="ghost"
+                  onClick={close}
+                />
+              </header>
+            </LayoutHeader>
+          }
+          content={<LayoutContent label={view.title}>{content}</LayoutContent>}
+        />
       </Dialog>
     );
   }
   return (
     <article hidden={!active} className="page" aria-label={view.title}>
-      <header className="pane-heading">
-        <span className="muted">{view.title}</span>
-        <IconButton
-          className="icon-button"
-          label={`关闭${view.title}`}
-          icon={<CloseIcon />}
-          variant="ghost"
-          onClick={close}
-        />
-      </header>
       {content}
     </article>
   );

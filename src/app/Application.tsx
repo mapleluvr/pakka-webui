@@ -1,58 +1,126 @@
-import { useEffect, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+} from "react";
+import type { ViewTarget } from "@pakka/webui-sdk";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { Dialog } from "@astryxdesign/core/Dialog";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Button } from "@astryxdesign/core/Button";
 import { InstanceView, CloseIcon } from "../host/InstanceView.js";
 import { viewHref } from "../host/links.js";
 import type { UiRegistry } from "../host/registry.js";
 import {
-  IdentityControls,
+  useIdentityControls,
   type LoginCredential,
 } from "../features/identity/IdentityControls.js";
 import type { usePakkaConnection } from "../features/identity/usePakkaConnection.js";
 import { useViewNavigation } from "./useViewNavigation.js";
+import { useAppearance } from "../features/settings/appearance.js";
+import { WorkspaceNavigation } from "./WorkspaceNavigation.js";
+import "./workspace.css";
 
+function MenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
 export function Application({
   registry,
   identity,
   initialCredential,
   refreshExtensions,
+  prepareView,
 }: {
   registry: UiRegistry;
   identity: ReturnType<typeof usePakkaConnection>;
   initialCredential?: LoginCredential;
   refreshExtensions(): Promise<void>;
+  prepareView(target: ViewTarget): Promise<void>;
 }) {
+  const { preferences } = useAppearance();
   const state = useSyncExternalStore(registry.subscribe, registry.getSnapshot);
-  const navigation = useViewNavigation(registry, state);
+  const navigation = useViewNavigation(registry, state, prepareView);
+  const [navOpen, setNavOpen] = useState(false);
   useEffect(() => {
     const current = state.instances.find(
       (view) => view.id === navigation.active,
     );
     document.title = current ? `${current.title} · Pakka` : "Pakka";
   }, [navigation.active, state.instances]);
+  useEffect(() => setNavOpen(false), [navigation.active]);
+  function linkClick(event: MouseEvent<HTMLAnchorElement>) {
+    navigation.linkClick(event);
+    if (
+      !event.button &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    )
+      setNavOpen(false);
+  }
+  function select(id: string) {
+    navigation.select(id);
+    setNavOpen(false);
+  }
+  function close(id: string) {
+    registry.close(id);
+    setNavOpen(false);
+    requestAnimationFrame(() =>
+      document.getElementById("main")?.focus({ preventScroll: true }),
+    );
+  }
+  const pages = (
+    <WorkspaceNavigation
+      state={state}
+      active={navigation.active}
+      linkClick={linkClick}
+      select={select}
+      close={close}
+    />
+  );
+  const identityControls = useIdentityControls({
+    ...identity,
+    initialCredential,
+  });
   return (
-    <Theme theme={neutralTheme} mode="light">
+    <Theme theme={neutralTheme} mode={preferences.mode}>
       <a className="skip-link" href="#main">
         跳到内容
       </a>
       <div className="workspace">
+        <header className="mobile-workspace-heading">
+          <IconButton
+            className="icon-button"
+            label="打开工作区导航"
+            icon={<MenuIcon />}
+            variant="ghost"
+            onClick={() => setNavOpen(true)}
+          />
+          <a className="brand" href="#/" onClick={linkClick}>
+            Pakka
+          </a>
+          <span className="brand-caption">Workspace</span>
+        </header>
         <aside className="sidebar" aria-label="工作区导航">
-          <a className="brand" href="#/" onClick={navigation.linkClick}>
+          <a className="brand" href="#/" onClick={linkClick}>
             Pakka<span className="brand-caption">Workspace</span>
           </a>
-          <nav className="nav-list" aria-label="功能">
-            {state.navigation.map((item) => (
-              <a
-                key={`${item.plugin}/${item.view}`}
-                href={viewHref(item)}
-                onClick={navigation.linkClick}
-              >
-                {item.title}
-              </a>
-            ))}
-          </nav>
+          {pages}
           {identity.connection && (
             <Button
               label="刷新插件"
@@ -60,28 +128,9 @@ export function Application({
               clickAction={refreshExtensions}
             />
           )}
-          <IdentityControls
-            {...identity}
-            initialCredential={initialCredential}
-          />
+          {identityControls.controls}
         </aside>
         <main id="main" className="main" tabIndex={-1}>
-          <nav className="tabs" aria-label="已打开页面">
-            {state.instances
-              .filter(
-                (view) =>
-                  view.placement === "page" || view.placement === "settings",
-              )
-              .map((view) => (
-                <button
-                  key={view.id}
-                  aria-pressed={navigation.active === view.id}
-                  onClick={() => navigation.select(view.id)}
-                >
-                  {view.title}
-                </button>
-              ))}
-          </nav>
           {!navigation.active && (
             <section className="welcome flow">
               <p className="eyebrow">Pakka Workspace</p>
@@ -103,7 +152,7 @@ export function Application({
                       plugin: "conversations",
                       view: "workspace",
                     })}
-                    onClick={navigation.linkClick}
+                    onClick={linkClick}
                   >
                     浏览 Conversations
                   </a>
@@ -111,7 +160,7 @@ export function Application({
                 <a
                   className="text-link"
                   href={viewHref({ plugin: "playground", view: "home" })}
-                  onClick={navigation.linkClick}
+                  onClick={linkClick}
                 >
                   进入组件实验室
                 </a>
@@ -142,6 +191,36 @@ export function Application({
           ))}
         </section>
       </div>
+      <Dialog
+        isOpen={navOpen}
+        width={360}
+        maxHeight="90dvh"
+        onOpenChange={setNavOpen}
+        aria-label="工作区导航"
+      >
+        <div className="navigation-sheet">
+          <header className="pane-heading">
+            <strong>Pakka</strong>
+            <IconButton
+              className="icon-button"
+              label="关闭工作区导航"
+              icon={<CloseIcon />}
+              variant="ghost"
+              onClick={() => setNavOpen(false)}
+            />
+          </header>
+          {pages}
+          {identity.connection && (
+            <Button
+              label="刷新插件"
+              variant="ghost"
+              clickAction={refreshExtensions}
+            />
+          )}
+          {identityControls.controls}
+        </div>
+      </Dialog>
+      {identityControls.dialog}
     </Theme>
   );
 }

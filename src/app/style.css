@@ -1,17 +1,17 @@
 :root {
-  color-scheme: light;
   font-size: 16px;
 }
 .workspace,
 .dialog-content,
-.model-picker {
+.model-picker,
+.navigation-sheet {
   --app-background: var(--color-background-body);
   --app-surface: var(--color-background-surface);
   --app-text: var(--color-text-primary);
   --app-muted: var(--color-text-secondary);
   --app-line: var(--color-border);
   --app-accent: var(--color-text-accent);
-  font-family: var(--font-family-body);
+  font-family: var(--reading-font, var(--font-family-body));
   color: var(--app-text);
   background: var(--app-background);
 }
@@ -98,6 +98,7 @@ p {
   display: none !important;
 }
 .workspace {
+  --workspace-header-height: 0px;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -107,13 +108,13 @@ p {
   top: 0;
   align-self: start;
   height: 100dvh;
-  overflow: auto;
-  padding: 28px 20px;
+  overflow: hidden;
+  padding: 24px 16px;
   background: var(--app-surface);
   border-right: 1px solid var(--app-line);
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 20px;
 }
 .brand {
   display: flex;
@@ -200,6 +201,17 @@ p {
   display: grid;
   gap: 10px;
 }
+button.directory-choice {
+  height: auto;
+  max-width: 100%;
+  padding-block: 10px;
+}
+.directory-name {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
 .resource-link {
   display: grid;
   gap: 4px;
@@ -255,6 +267,122 @@ p {
 }
 .original-content {
   margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-line);
+}
+.content-body,
+.markdown-body,
+.code-block,
+.original-content {
+  min-width: 0;
+}
+.text-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--app-accent);
+  text-underline-offset: 3px;
+}
+.copy-action {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.markdown-body {
+  font-size: 1rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.markdown-body > * + * {
+  margin-top: 1em;
+}
+.markdown-body :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1em 0.5em;
+  font-size: 1.15em;
+  line-height: 1.4;
+}
+.markdown-body :is(ul, ol) {
+  padding-inline-start: 1.5em;
+}
+.markdown-body a {
+  color: var(--app-accent);
+  text-underline-offset: 3px;
+}
+.markdown-body blockquote {
+  margin-inline: 0;
+  padding-inline-start: 1em;
+  border-inline-start: 3px solid var(--app-line);
+  color: var(--app-muted);
+}
+.markdown-body code {
+  font-family: var(--font-family-code);
+  font-size: 0.9em;
+}
+.code-block {
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.code-block pre {
+  margin: 0;
+  padding: 12px 16px;
+  white-space: pre;
+  overflow-wrap: normal;
+  max-width: 100%;
+}
+.markdown-table {
+  max-width: 100%;
+  overflow: auto;
+}
+.markdown-table table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+.markdown-table :is(th, td) {
+  padding: 8px 12px;
+  border: 1px solid var(--app-line);
+  text-align: start;
+}
+.virtual-space {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.transcript-row,
+.original-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+}
+.original-text {
+  height: min(50vh, 420px);
+  overflow: auto;
+  contain: strict;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  font-family: var(--font-family-code);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.original-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-inline: 12px;
+}
+.tool-card summary {
+  overflow-wrap: anywhere;
+}
+.tool-details {
+  padding-top: 12px;
+}
+.original-match {
+  padding: 12px;
+  border-inline-start: 3px solid var(--app-accent);
+  background: var(--color-background-muted);
 }
 pre {
   white-space: pre-wrap;
@@ -484,27 +612,11 @@ summary {
 }
 @media (max-width: 760px) {
   .workspace {
+    --workspace-header-height: 56px;
     grid-template-columns: minmax(0, 1fr);
   }
   .sidebar {
-    position: static;
-    height: auto;
-    padding: 16px;
-    gap: 14px;
-    border-right: 0;
-    border-bottom: 1px solid var(--app-line);
-  }
-  .nav-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .identity {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-  .tabs {
-    padding-inline: 16px;
+    display: none;
   }
   .page {
     padding: 16px 16px 48px;

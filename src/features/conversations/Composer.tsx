@@ -1,4 +1,7 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Dictation } from "./Dictation.js";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { CloseIcon } from "../../host/InstanceView.js";
 import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -19,36 +22,59 @@ import {
 } from "./ModelPicker.js";
 import { dispatchExtensionCommand } from "../../integrations/pakka/extensions.js";
 import { useConversationConfiguration } from "./useConversationConfiguration.js";
+import { ConversationSettings } from "./ConversationSettings.js";
 import {
   useConversationInput,
   type InputMode,
 } from "./useConversationInput.js";
+
+import { inputModeLabel, inputStatus } from "./input-labels.js";
 
 export function Composer({
   ui,
   connection,
   target,
   changed,
+  onSubmitted,
   disabled,
+  running,
 }: {
   ui: UiContext;
   connection: PakkaConnection;
   target: AgentRef;
   changed(): void;
+  onSubmitted?(): void;
   disabled: boolean;
+  running: boolean;
 }) {
-  const config = useConversationConfiguration(ui, connection, target);
+  const config = useConversationConfiguration(ui, connection, target, changed);
   const delivery = useConversationInput(ui, connection, target, changed);
-  const [draft, setDraft] = useState("");
-  const [mode, setMode] = useState<InputMode>("prompt");
+  const [draft, setDraft] = useState(() =>
+    delivery.pending && delivery.pending !== "unreadable"
+      ? delivery.pending.text
+      : "",
+  );
+  const [mode, setMode] = useState<InputMode>(() =>
+    delivery.pending && delivery.pending !== "unreadable"
+      ? delivery.pending.mode
+      : "prompt",
+  );
   const [picker, setPicker] = useState<"model" | "thinking" | null>(null);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const commandPending = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const dictationSignal = useMemo(
+    () => AbortSignal.any([ui.signal, connection.signal]),
+    [ui.signal, connection.signal],
+  );
   const busy = disabled || config.busy || delivery.busy || resolving;
   const configurable =
-    !!config.configuration?.canConfigure && !config.unconfirmed && !busy;
+    !!config.configuration?.canConfigure &&
+    config.supportsRequests &&
+    !config.unconfirmed &&
+    !busy &&
+    !running;
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
   function closePicker() {
     setPicker(null);
@@ -78,7 +104,13 @@ export function Composer({
     }
   }
   async function submit() {
-    if (busy || commandPending.current || !draft.trim() || delivery.pending)
+    if (
+      busy ||
+      config.unconfirmed ||
+      commandPending.current ||
+      !draft.trim() ||
+      delivery.pending
+    )
       return;
     const text = draft.trim();
     setError(null);
@@ -131,40 +163,61 @@ export function Composer({
       }
       return;
     }
-    if (await delivery.submit(config.currentTarget(), draft, mode))
-      setDraft("");
+    if (await delivery.submit(config.currentTarget(), draft, mode)) {
+      setDraft((current) => (current === draft ? "" : current));
+      onSubmitted?.();
+    }
   }
   return (
     <section className="composer surface flow" aria-label="Conversation 输入">
       <div className="actions model-controls">
         <Button
           label={config.configuration?.current?.model ?? "选择模型"}
+          className="composer-model-control"
+          size="sm"
           variant="ghost"
           isDisabled={!configurable}
           onClick={() => setPicker("model")}
         />
-        <Selector
-          label="Thinking"
-          options={[...(config.model?.thinkingLevels ?? [])]}
-          value={config.configuration?.current?.thinkingLevel}
-          placeholder="默认"
-          presentation="adaptive"
-          controlClassName="touch-control"
+        <Button
+          label={
+            config.model?.thinkingLevels.length
+              ? `Thinking · ${config.configuration?.current?.thinkingLevel ?? "默认"}`
+              : "Thinking · 不支持"
+          }
+          size="sm"
+          variant="ghost"
           isDisabled={!configurable || !config.model?.thinkingLevels.length}
-          onChange={(level) => {
-            void thinking(level);
-          }}
+          onClick={() => setPicker("thinking")}
+        />
+        <ConversationSettings
+          compact
+          ui={ui}
+          connection={connection}
+          config={config}
+          disabled={busy}
+          running={running}
+        />
+        <Dictation
+          compact
+          key={JSON.stringify(config.currentTarget())}
+          box={input}
+          signal={dictationSignal}
+          enabled={!busy && !config.unconfirmed && !delivery.pending}
+          onText={setDraft}
         />
       </div>
       {config.unconfirmed && (
         <div role="status" className="flow compact">
-          <p>
-            需要读取当前配置后才能继续修改；读取当前值不确认此前请求的结果。
+          <p className="identifier">
+            {config.pending === "unreadable"
+              ? "本地配置原请求不可读，请保留记录；当前已阻止继续提交。"
+              : `配置原请求 ${config.pending?.requestId} 的结果尚未确认，当前已阻止重复保存。`}
           </p>
           <Button
-            label="读取当前配置"
+            label="核对配置原请求"
             variant="ghost"
-            isDisabled={config.busy}
+            isDisabled={config.busy || config.pending === "unreadable"}
             onClick={() => {
               void config.reconcile();
             }}
@@ -181,9 +234,10 @@ export function Composer({
         <TextArea
           ref={input}
           label="消息或命令"
+          isLabelHidden
           value={draft}
           onChange={setDraft}
-          rows={4}
+          rows={3}
           placeholder="输入消息，或使用 /model、/thinking"
           autoComplete="off"
           controlClassName="composer-input"
@@ -203,23 +257,30 @@ export function Composer({
             label="输入方式"
             isLabelHidden
             options={[
-              { value: "prompt", label: "新请求" },
-              { value: "steer", label: "Steer" },
-              { value: "followUp", label: "Follow-up" },
+              { value: "prompt", label: inputModeLabel.prompt },
+              { value: "steer", label: inputModeLabel.steer },
+              { value: "followUp", label: inputModeLabel.followUp },
             ]}
             value={mode}
             onChange={(value) => setMode(value as InputMode)}
             presentation="adaptive"
             controlClassName="touch-control"
           />
-          <span className="muted">Enter 提交 · Shift+Enter 换行</span>
+          <span className="muted">Enter 发送 · Shift+Enter 换行</span>
           <Button
-            label={busy ? "正在处理…" : "提交"}
+            label={busy ? "正在处理…" : inputModeLabel[mode]}
             type="submit"
-            isDisabled={busy || !draft.trim() || !!delivery.pending}
+            isDisabled={
+              busy || config.unconfirmed || !draft.trim() || !!delivery.pending
+            }
           />
         </div>
       </form>
+      {running && (
+        <p className="muted">
+          调整消息会在下一次可介入时送达。后续消息在本轮工作结束后执行。
+        </p>
+      )}
       {(error ?? config.error ?? delivery.error) && (
         <p role="alert" className="error-text">
           {error ?? config.error ?? delivery.error}
@@ -227,31 +288,42 @@ export function Composer({
       )}
       {delivery.receipt && (
         <p role="status" className="muted">
-          输入回执：{delivery.receipt.status}
+          本次提交：{inputStatus[delivery.receipt.status]}
         </p>
       )}
       {delivery.pending && (
-        <div role="status" className="flow compact">
+        <div role="status" className="input-pending flow compact">
           {delivery.pending === "unreadable" ? (
             <p>本地待核对记录不可读。请保留原记录，当前已阻止重复提交。</p>
           ) : (
             <>
-              <p>
-                原请求 {delivery.pending.requestId}{" "}
-                的结果尚未确认，已阻止重复提交。
-              </p>
-              {delivery.pending.receiptId ? (
+              <p>这条消息的结果尚未确认，已阻止重复提交。</p>
+              <details className="pending-input-original">
+                <summary>
+                  原消息 · {inputModeLabel[delivery.pending.mode]}
+                </summary>
+                <pre>{delivery.pending.text}</pre>
+                <p className="identifier">
+                  原请求 {delivery.pending.requestId}
+                </p>
+              </details>
+              {delivery.pending.receiptId || delivery.pending.target ? (
                 <Button
-                  label="核对原回执"
+                  label="核对原请求"
                   variant="ghost"
                   isDisabled={busy}
                   onClick={() => {
-                    void delivery.check();
+                    void delivery.check().then((acceptedText) => {
+                      if (alive() && acceptedText !== undefined)
+                        setDraft((current) =>
+                          current === acceptedText ? "" : current,
+                        );
+                    });
                   }}
                 />
               ) : (
                 <p className="muted">
-                  尚未取得可查询的回执身份。请保留原请求记录，勿以新请求重发。
+                  原记录缺少提交时的运行绑定，请保留原请求记录。
                 </p>
               )}
             </>
@@ -276,7 +348,15 @@ export function Composer({
           aria-label="选择 Thinking"
         >
           <div className="dialog-content flow">
-            <h2>Thinking</h2>
+            <header className="pane-heading">
+              <h2>Thinking</h2>
+              <IconButton
+                label="关闭 Thinking 选择"
+                icon={<CloseIcon />}
+                variant="ghost"
+                onClick={closePicker}
+              />
+            </header>
             <p>
               当前设置：
               {config.configuration?.current?.thinkingLevel ?? "模型默认"}

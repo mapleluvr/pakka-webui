@@ -15,8 +15,10 @@ import {
 
 export interface PakkaConnection {
   readonly identity: string;
+  readonly origin: string;
   readonly person: PocketPerson;
   readonly serverId: string;
+  readonly sessionId: string;
   readonly signal: AbortSignal;
   readonly workbench: PocketClient;
   readonly services: WebUiServiceClient;
@@ -37,7 +39,7 @@ function csrf(): string | null {
 export async function connectPakka(
   origin: string,
   signal: AbortSignal,
-  expired: () => void,
+  expired: (message?: string) => void,
 ): Promise<PakkaConnection> {
   const workbench = createPocketClient({
     endpoint: `${origin}/pakka-webui/rpc`,
@@ -77,6 +79,13 @@ export async function connectPakka(
       throw reason;
     }
   }
+  function checkServer<T extends { readonly serverId: string }>(result: T): T {
+    if (result.serverId !== hello.serverId) {
+      expired("Pakka 已重新启动，请重新连接以核对当前身份。");
+      throw new Error("Pakka 服务身份已变化，原请求仍需核对。");
+    }
+    return result;
+  }
   const extensions = createExtensionClient({
     ...binding,
     endpoint: `${origin}/pakka-webui/extensions/rpc`,
@@ -87,13 +96,18 @@ export async function connectPakka(
   };
   return Object.freeze<PakkaConnection>({
     identity: JSON.stringify([hello.serverId, hello.person.id]),
+    origin,
     person: hello.person,
     serverId: hello.serverId,
+    sessionId: hello.sessionId,
     signal,
     workbench: {
       request: (command, options) =>
-        guarded(() => workbench.request(command, options)),
-      reconnect: (options) => guarded(() => workbench.reconnect(options)),
+        guarded(async () =>
+          checkServer(await workbench.request(command, options)),
+        ),
+      reconnect: (options) =>
+        guarded(async () => checkServer(await workbench.reconnect(options))),
     },
     services: protectedServices,
     extensions: {

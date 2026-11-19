@@ -64,6 +64,7 @@ export function createUiRegistry(options: {
   >();
   const cleanupFailures = new Map<string, unknown>();
   const listeners = new Set<() => void>();
+  const closeListeners = new Set<(view: OpenView) => void>();
   let notices: RegistrySnapshot["notices"] = [];
   let snapshot: RegistrySnapshot = { navigation: [], instances: [], notices };
   function changed(publicationChanged = false) {
@@ -81,17 +82,17 @@ export function createUiRegistry(options: {
     for (const listener of listeners) listener();
   }
   function notice(value: UiNotice) {
-    notices = Object.freeze([
-      ...notices.slice(-4),
-      { ...value, id: crypto.randomUUID() },
-    ]);
+    const id = crypto.randomUUID();
+    notices = Object.freeze([...notices.slice(-4), { ...value, id }]);
     changed();
+    return id;
   }
   function active(owner: string, signal: AbortSignal) {
     if (signal.aborted || (!instances.has(owner) && !invocations.has(owner)))
       throw new Error("UI instance is no longer available");
   }
   function close(id: string) {
+    const closed = instances.get(id)?.view;
     const instance = instances.get(id) ?? invocations.get(id);
     if (!instance) return;
     try {
@@ -102,6 +103,14 @@ export function createUiRegistry(options: {
       instances.delete(id);
       invocations.delete(id);
       changed();
+      if (closed)
+        for (const listener of closeListeners) {
+          try {
+            listener(closed);
+          } catch {
+            notice({ tone: "error", message: "界面关闭后的清理未能确认。" });
+          }
+        }
     }
   }
   function open(target: ViewTarget, placement?: SurfacePlacement): string {
@@ -127,6 +136,13 @@ export function createUiRegistry(options: {
     instances.set(id, { view: opened, dispose: instance.dispose });
     changed();
     return id;
+  }
+  function setTitle(id: string, title: string) {
+    const instance = instances.get(id);
+    const label = title.trim().slice(0, 256);
+    if (!instance || !label || instance.view.title === label) return;
+    instance.view = Object.freeze({ ...instance.view, title: label });
+    changed();
   }
   const ports: UiPorts = {
     notice: (value) => notice(value),
@@ -211,6 +227,13 @@ export function createUiRegistry(options: {
         listeners.delete(listener);
       };
     },
+    /** Explicit instance close; publication replacement has its own lifetime. */
+    onClose(listener: (view: OpenView) => void) {
+      closeListeners.add(listener);
+      return () => {
+        closeListeners.delete(listener);
+      };
+    },
     publish<Bindings>(input: {
       plugin: UiPlugin<Bindings>;
       generation: string;
@@ -266,6 +289,7 @@ export function createUiRegistry(options: {
     remove,
     open,
     close,
+    setTitle,
     notice,
     dismiss(id: string) {
       notices = notices.filter((item) => item.id !== id);

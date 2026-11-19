@@ -29,26 +29,36 @@ Pakka 人类凭据在登录弹窗交换为同源会话。凭据不要写入源�
 | `src/integrations/pakka/`                           | 公开客户端、身份、资源解析、插件资产与 Backend bindings |
 | `src/plugins/playground.tsx`                        | 不需要服务或 Session 的纯 UI 插件                       |
 | `src/features/conversations/`                       | 授权资源列表、原历史/原文、当前模型/Thinking 与输入     |
-| `src/features/settings/`                            | 实例模型连接、Person 默认值及原请求核对                 |
+| `src/features/settings/`                            | 模型、预算、人员、facet 与通知设置及原请求核对          |
 
-Conversation 可按完整 Session/Conversation 引用打开；未加载来源标记为保存历史。正文按公开范围读取，分叉来源保留原引用；状态或权限不成立时显示对应结果。当前应用仍以有限读取和显式刷新为主，完整事件观察与 Conversation 功能由后续阶段补齐。
+Conversation 可按完整 Session/Conversation 引用打开；未加载来源标记为保存历史。正文按公开范围读取，分叉来源保留原引用；状态或权限不成立时显示对应结果。实时观察使用有界 SSE 预览和快照恢复，队列、撤回与停止沿原服务接续；关闭观察只结束页面读取，模型工作由原服务管理。
 
 输入 `/model` 或点击模型按钮打开搜索选择器；`/model provider/model` 精确选择。`/thinking` 与点击/触控入口使用相同的 Conversation 配置操作。无认证来源的模型明确拒绝选择；列表中的 configured 不代表在线可用或能力已验证。
 
 实例连接参数按原生 `models.json` 的字段修改，保存前校验；受保护值和未编辑字段由服务保全。个人默认独立保存，只参与此 Person 后续缺省 Conversation 的创建。结果未知时按原请求查询，不重复提交。多个设置实例共享同一作用域的待核对保护：发送前同步保留身份，只有对应 requestId 的结果能清除记录。
 
-普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。公开输入回执查询仍待阶段 4 接通，不能把现有保护当成完整恢复功能。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。
+普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。恢复经 services 4 的 `input.lookup` 核对完整原 target/text/mode/requestId，空值或 unknown 保持待核对。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。重新装载时，输入框和 mode 从这份原记录初始化；详情显示冻结的原消息与请求号。确认旧请求时只清除对应记录，后来另写的草稿保持原样。
+
+工作台在 PC 使用侧栏，窄屏使用导航抽屉；Conversation 历史独立滚动，下部输入始终可达。消息 header 提供复制、原文与原 Entry 分叉。固定阅读导航承载原文返回和最新消息入口，控制位置按内容身份保存。明确发送接续新回复，手动阅读暂停跟随；同一范围的历史刷新和配置不会重新触发此前发送的跟随意图。实际结果与未覆盖条件见[工作台界面](../verification/WORKBENCH-INTERFACE.md)。
 
 ## 业务插件
 
-Pakka 接入层发现已授权的 app-scope WebUI contribution，按其 WebUI generation 加载固定 JS/CSS，再向 registry 发布普通 React view。它显式注入 `@pakka/client/extensions` 的 `ExtensionServiceBinding`；新调用取当前 Backend publication，原请求核对独立于 Backend 的启用状态。当前加载器实现 app-scope 切片，其他资源范围由后续消费者形成。
+Pakka 接入层发现已授权的 app-scope 与 Conversation 资源贡献，按其 WebUI generation 加载固定 JS/CSS，再向 registry 发布普通 React view。它显式注入 `@pakka/client/extensions` 的 `ExtensionServiceBinding`；新调用取当前 Backend publication，原请求核对独立于 Backend 的启用状态。资源地址带完整 Session/Conversation，直接刷新时重新解析与授权，关闭最后实例时释放该恢复装载作用域。
 
 RSI 工单组件、草稿和领域 decoder 位于 Pakka 的 `@pakka/rsi` 包。前端宿主只拥有通用装载与绑定。RSI 写入的恢复顺序是浏览器 requestId → `operationByRequest` → 外层 operation → operation.id 对应的工单回执；查询不重放写入。WebUI publication 替换会清理旧实例、样式和 Dialog，已接纳的服务工作仍由后端接续。
 
 共享 React、SDK、Astryx 的依赖及插件 external 规则见 [UI SDK](UI-SDK.md)。可信模块加载不构成浏览器安全沙箱。
 
+## 通知与 worker
+
+通知设置区分 Person 偏好、所选获准 Conversation 的设备登记和本浏览器能力。只读成员也可修改自己的偏好。设备停用解除全部已登记资源；“移除本浏览器推送订阅”是独立本地动作。未知修改只查询原请求，当前清单不证明旧操作已完成。
+
+“检查系统通知显示”从真实点击请求浏览器权限，由用户处理提示。成功信息只说明浏览器接纳了显示调用，实际显示要直接查看系统通知区；它不证明远端推送已到达。“登记此 Conversation”使用原生 PushManager，还需要可用的推送网络和服务端许可该浏览器实际端点的精确 HTTPS origin。部署者用 `notifications.endpointOrigins` 指定完整许可列表；示例验收中的 Windows Ego 端点为 `https://jmt17.google.com`，该 origin 仅在隔离验收配置中显式采用。
+
+固定应用文件 `notification-worker.js` 通过 `/pakka-webui/service-worker.js` 提供，生产和开发 header 均声明 `Service-Worker-Allowed: /`。worker 收到事件/设备身份后重新受权读取内容；点击再次授权并进入原 Conversation。暂停或关闭设置结束读取，后台通知仍由服务管理。实际系统显示与点击可独立核对，不从服务发送回执推断；本轮证据和待复验条件见[工作入口](../OVERVIEW.md)。
+
 ## 固定制品与 CSP
 
 使用 `npm run pack:app -- <新目录>` 交付完整应用的固定静态 tgz；归档组成、摘要来源及更新流程见[应用交付](DELIVERY.md)。发布候选使用解包后的完整应用目录和其 manifest 的 SHA-256，由 Pakka 公开 Node 装配参数 `frontend: { directory, manifestSha256 }` 指定。Node 启动前校验 schema、服务兼容和每个文件的 hash。此动作是显式候选装配；默认产品切换、部署和发布分别处理。
 
-当前组合为资产 schema 2、services 3、extensions 3、workbench 2，UI SDK api 1 / `react19-astryx0.7.15`。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
+阶段 4 开发组合为资产 schema 2、services 4、extensions 3、workbench 2，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。

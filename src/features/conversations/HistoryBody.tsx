@@ -1,199 +1,147 @@
-import { useState } from "react";
-import { Button } from "@astryxdesign/core/Button";
-import type { UiContext } from "@pakka/webui-sdk";
-import type {
-  PocketContentReference,
-  PocketContentChunk,
-  PocketMessage,
-  PocketSnapshot,
-} from "@pakka/protocol/pocket";
-import type { ConversationReference } from "@pakka/protocol/webui";
-import {
-  describeFailure,
-  requestSignal,
-  type PakkaConnection,
-} from "../../integrations/pakka/connection.js";
+import { useLayoutEffect, useMemo, useState, type RefObject } from "react";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { MoreIcon } from "./ReadingIcons.js";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import type { PocketSnapshot } from "@pakka/protocol/pocket";
+import { TextContent, type ContentBindings } from "./TextContent.js";
+import { MessageBody, ToolCard } from "./ToolCard.js";
+import { rowPreview, transcriptRows } from "./transcript.js";
+import { TranscriptWindow } from "./TranscriptWindow.js";
 
-type ContentBindings = {
-  ui: UiContext;
-  connection: PakkaConnection;
-  conversation: ConversationReference;
-};
-function OriginalContent({
-  reference,
-  ...bindings
-}: ContentBindings & { reference?: PocketContentReference }) {
-  const [chunk, setChunk] = useState<PocketContentChunk | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  if (!reference || reference.previewComplete) return null;
-  if (reference.byteLength === 0) return <p className="muted">原文为空。</p>;
-  async function load(offset: number) {
-    if (!reference || busy) return;
-    setBusy(true);
-    setError(null);
-    const signal = requestSignal(bindings.ui.signal, bindings.connection);
-    try {
-      const result = await bindings.connection.services.request(
-        {
-          op: "resource.content",
-          reference: bindings.conversation,
-          content: reference,
-          range: {
-            offset,
-            length: Math.min(65536, reference.byteLength - offset),
-          },
-        },
-        { signal },
-      );
-      if (!signal.aborted) setChunk(result.chunk);
-    } catch (reason) {
-      if (!signal.aborted) setError(describeFailure(reason));
-    } finally {
-      if (!signal.aborted) setBusy(false);
-    }
-  }
-  return (
-    <div className="original-content flow compact">
-      {!chunk && (
-        <Button
-          label={busy ? "正在读取…" : "读取原文"}
-          variant="ghost"
-          isDisabled={busy}
-          onClick={() => {
-            void load(0);
-          }}
-        />
-      )}
-      {chunk && (
-        <>
-          <p className="muted">
-            原文 · {reference.encoding} · 字节 {chunk.offset}–{chunk.nextOffset}{" "}
-            / {reference.byteLength}
-          </p>
-          <pre>{chunk.text}</pre>
-          <div className="actions">
-            <Button
-              label="回到开头"
-              variant="ghost"
-              isDisabled={busy || chunk.offset === 0}
-              onClick={() => {
-                void load(0);
-              }}
-            />
-            <Button
-              label={busy ? "正在读取…" : "下一段"}
-              variant="ghost"
-              isDisabled={busy || chunk.complete}
-              onClick={() => {
-                void load(chunk.nextOffset);
-              }}
-            />
-            <Button
-              label="收起原文"
-              variant="ghost"
-              onClick={() => setChunk(null)}
-            />
-          </div>
-        </>
-      )}
-      {error && (
-        <p role="alert" className="error-text">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-function Message({
-  message,
-  ...bindings
-}: ContentBindings & { message: PocketMessage }) {
-  return (
-    <div className={`message message-${message.role}`}>
-      <header className="message-label">
-        {message.role === "user"
-          ? "你"
-          : message.role === "assistant"
-            ? "Assistant"
-            : `工具 · ${message.toolName ?? "结果"}`}
-        {message.isError && " · 失败"}
-      </header>
-      {typeof message.content === "string" ? (
-        <p className="message-text">{message.content}</p>
-      ) : (
-        message.content.map((part, index) => (
-          <div key={index}>
-            {part.type === "text" && (
-              <p className="message-text">{part.text}</p>
-            )}
-            {part.type === "thinking" && (
-              <details>
-                <summary>Thinking</summary>
-                <p className="message-text">{part.thinking}</p>
-              </details>
-            )}
-            {part.type === "toolCall" && (
-              <details>
-                <summary>工具调用 · {part.name}</summary>
-                <pre>{JSON.stringify(part.arguments, null, 2)}</pre>
-              </details>
-            )}
-            {part.type === "image" &&
-              (!part.contentReference ||
-                part.contentReference.previewComplete) &&
-              /^image\/(?:png|jpeg|gif|webp)$/.test(part.mimeType) && (
-                <img
-                  className="message-image"
-                  src={`data:${part.mimeType};base64,${part.data}`}
-                  alt="Conversation 中的图片"
-                  loading="lazy"
-                />
-              )}
-            <OriginalContent {...bindings} reference={part.contentReference} />
-          </div>
-        ))
-      )}
-      <OriginalContent {...bindings} reference={message.contentReference} />
-      {message.errorMessage && (
-        <p className="error-text">{message.errorMessage}</p>
-      )}
-      <OriginalContent {...bindings} reference={message.errorReference} />
-    </div>
-  );
-}
 export function HistoryBody({
   entries,
+  live,
+  onFork,
+  scroll,
+  controls,
+  followRevision,
   ...bindings
-}: ContentBindings & { entries: PocketSnapshot["entries"] }) {
+}: ContentBindings & {
+  followRevision: number;
+  scroll: RefObject<HTMLDivElement | null>;
+  controls?: HTMLElement | null;
+  entries: PocketSnapshot["entries"];
+  live?: PocketSnapshot["live"];
+  onFork?(entryId: string): void;
+}) {
+  const [query, setQuery] = useState("");
+  useLayoutEffect(() => {
+    if (followRevision > 0) setQuery("");
+  }, [followRevision]);
+  const rows = useMemo(
+    () => transcriptRows(entries, live, bindings.conversation),
+    [entries, live, bindings.conversation],
+  );
+  const selected = useMemo(() => {
+    const needle = query.toLocaleLowerCase();
+    return needle
+      ? rows.filter((row) =>
+          rowPreview(row).toLocaleLowerCase().includes(needle),
+        )
+      : rows;
+  }, [rows, query]);
   return (
     <div className="transcript">
-      {!entries.length && <p className="muted">此页还没有保存的内容。</p>}
-      {entries.map((entry) => (
-        <section
-          key={entry.id}
-          className="history-entry"
-          aria-label={`历史 ${entry.id}`}
-        >
-          {entry.sourceConversationId && (
-            <p className="muted identifier">
-              来自分叉源 Conversation {entry.sourceConversationId}
+      {rows.length > 0 && (
+        <div className="history-search">
+          <TextInput
+            label="搜索本页预览"
+            isLabelHidden
+            placeholder="搜索本页预览"
+            value={query}
+            onChange={setQuery}
+            autoComplete="off"
+            controlClassName="touch-control"
+          />
+          <details className="history-search-scope">
+            <summary>搜索范围</summary>
+            <p className="muted">
+              仅搜索当前页已载入的预览，不区分大小写；未载入的历史与截断正文不在此范围。单条完整内容请使用“原文与搜索”。
+            </p>
+          </details>
+          {query && (
+            <p role="status">
+              {selected.length} / {rows.length} 条内容匹配。
             </p>
           )}
-          {entry.messages.map((message, index) => (
-            <Message key={index} {...bindings} message={message} />
-          ))}
-          {entry.display && (
-            <div className="message display">
-              <p className="message-text">{entry.display.text}</p>
-              <OriginalContent
-                {...bindings}
-                reference={entry.display.contentReference}
+        </div>
+      )}
+      {!rows.length && <p className="muted">此页还没有保存的内容。</p>}
+      <TranscriptWindow
+        followRevision={followRevision}
+        scroll={scroll}
+        controls={controls}
+        rows={selected}
+        render={(row) => {
+          const menu =
+            onFork && row.entryId ? (
+              <MoreMenu
+                label="消息操作"
+                icon={<MoreIcon />}
+                alignment="end"
+                items={[
+                  {
+                    label: "从这里分叉",
+                    onClick: () => {
+                      if (row.entryId) onFork(row.entryId);
+                    },
+                  },
+                ]}
               />
-            </div>
-          )}
-        </section>
-      ))}
+            ) : undefined;
+          return (
+            <section
+              className="history-entry"
+              data-live={row.isLive || undefined}
+            >
+              {row.source !== bindings.conversation.conversationId && (
+                <p className="muted identifier">
+                  来自分叉源 Conversation {row.source}
+                </p>
+              )}
+              {row.kind === "tool" ? (
+                <ToolCard
+                  tool={row.tool}
+                  identity={row.key}
+                  source={row.source}
+                  {...bindings}
+                />
+              ) : row.kind === "display" ? (
+                <div className="message display">
+                  <TextContent
+                    text={row.display.text}
+                    reference={row.display.contentReference}
+                    {...bindings}
+                  />
+                </div>
+              ) : (
+                <div className={`message message-${row.message.role}`}>
+                  <MessageBody
+                    heading={
+                      <>
+                        {row.message.role === "user" ? "User" : "Assistant"}
+                        {row.isLive && live?.busy && " · 正在生成"}
+                      </>
+                    }
+                    extraActions={menu}
+                    message={row.message}
+                    identity={row.key}
+                    {...bindings}
+                  />
+                </div>
+              )}
+              {row.kind !== "message" && menu && (
+                <div className="entry-actions">{menu}</div>
+              )}
+            </section>
+          );
+        }}
+      />
+      {live && (
+        <p role="status" className="muted">
+          {live.busy ? "正在执行" : "当前空闲"}
+        </p>
+      )}
     </div>
   );
 }

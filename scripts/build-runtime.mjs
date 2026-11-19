@@ -3,6 +3,9 @@ import {
   WEBUI_ASSET_SCHEMA,
   decodeWebUiInlineStyleHashes,
 } from "@pakka/protocol/webui-assets";
+import { WEBUI_SERVICE_API } from "@pakka/protocol/webui";
+import { POCKET_VERSION } from "@pakka/protocol/pocket";
+import { EXTENSION_VERSION } from "@pakka/protocol/extension-rpc";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -258,7 +261,11 @@ for (const [index, specifier] of keys.entries()) {
 const manifest = {
   schema: WEBUI_ASSET_SCHEMA,
   inlineStyleHashes,
-  requires: { services: 3, workbench: 2, extensions: 3 },
+  requires: {
+    services: WEBUI_SERVICE_API,
+    workbench: POCKET_VERSION,
+    extensions: EXTENSION_VERSION,
+  },
   runtime: {
     id: "react19-astryx0.7.15",
     sdk: own.version,

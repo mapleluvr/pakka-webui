@@ -22,7 +22,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "check": "npm run build:sdk && tsc -p tsconfig.json --noEmit",
+    "check": "npm run build:sdk && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "build:sdk": "tsc -p tsconfig.sdk.json",
     "build:runtime": "node scripts/build-runtime.mjs",
     "build:app": "node scripts/build-app.mjs",
@@ -35,17 +35,20 @@
     "react": ">=19.0.0 <20.0.0"
   },
   "devDependencies": {
-    "@pakka/client": "file:vendor/pakka-client-96236109a3fb92a3.tgz",
-    "@pakka/protocol": "file:vendor/pakka-protocol-c57ec7c43f2d8156.tgz",
     "@astryxdesign/core": "0.7.15",
     "@astryxdesign/theme-neutral": "0.7.15",
+    "@pakka/client": "file:vendor/pakka-client-73510b9c9689d6ae.tgz",
+    "@pakka/protocol": "file:vendor/pakka-protocol-d17f5af6cd81e18d.tgz",
     "@stylexjs/stylex": "0.19.2",
+    "@tanstack/react-virtual": "3.13.12",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "esbuild": "0.28.2",
     "prettier": "3.6.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
     "typescript": "7.0.2"
   }
 }

@@ -4,6 +4,7 @@ import {
   type AgentRef,
   type PocketInputReceipt,
 } from "@pakka/client/pocket";
+import { decodeOriginalConversationInput } from "@pakka/protocol/webui";
 import type { UiContext } from "@pakka/webui-sdk";
 import {
   readPending,
@@ -21,6 +22,8 @@ type OriginalInput = {
   requestId: string;
   text: string;
   mode: InputMode;
+  /** Older local records can lack this field; never infer their original incarnation. */
+  target?: AgentRef;
   receiptId?: string;
 };
 type Pending = OriginalInput | "unreadable" | null;
@@ -39,6 +42,12 @@ function decodeOriginalInput(value: unknown): OriginalInput {
       (typeof value.receiptId !== "string" || !value.receiptId))
   )
     throw new Error("原输入记录不可读。");
+  if ("target" in value) {
+    decodeOriginalConversationInput({
+      target: value.target,
+      input: { requestId: value.requestId, text: value.text, mode: value.mode },
+    });
+  }
   return value as OriginalInput;
 }
 function restore(key: string): Pending {
@@ -73,7 +82,13 @@ export function useConversationInput(
       result.actorId !== connection.person.id ||
       result.requestId !== original.requestId ||
       result.target.sessionId !== target.sessionId ||
-      result.target.conversationId !== target.conversationId
+      result.target.conversationId !== target.conversationId ||
+      (original.target &&
+        (result.target.key !== original.target.key ||
+          result.target.incarnation !== original.target.incarnation ||
+          result.target.profile !== original.target.profile ||
+          result.target.sessionId !== original.target.sessionId ||
+          result.target.conversationId !== original.target.conversationId))
     )
       throw new Error("原请求身份未得到确认。");
     if (result.status === "unknown") {
@@ -95,7 +110,7 @@ export function useConversationInput(
       setReceipt(result);
       changed();
     }
-    return !["denied", "cancelled"].includes(result.status);
+    return result.status !== "unanswered";
   }
   async function submit(
     ref: AgentRef,
@@ -115,6 +130,7 @@ export function useConversationInput(
       requestId: crypto.randomUUID(),
       text,
       mode,
+      target: ref,
     };
     try {
       const reserved = claimPending(key, original, decodeOriginalInput);
@@ -125,7 +141,11 @@ export function useConversationInput(
       )
         return false;
       const result = await connection.workbench.request(
-        { op: "submit", target: ref, input: original },
+        {
+          op: "submit",
+          target: ref,
+          input: { requestId: original.requestId, text, mode },
+        },
         {
           signal: requestSignal(ui.signal, connection),
           requestId: original.requestId,
@@ -152,17 +172,49 @@ export function useConversationInput(
     if (admission.current || !alive()) return;
     const original = restore(key);
     setPending(original);
-    if (!original || original === "unreadable" || !original.receiptId) return;
+    if (!original || original === "unreadable") return;
+    if (!original.receiptId && !original.target) {
+      setError("原记录缺少提交时的运行绑定，无法安全查询；请保留原请求。");
+      return;
+    }
     admission.current = true;
     setBusy(true);
     setError(null);
     try {
-      const result = await connection.workbench.request(
-        { op: "receipt", id: original.receiptId, sessionId: target.sessionId },
-        { signal: requestSignal(ui.signal, connection) },
-      );
-      if (result.kind !== "receipt") throw new Error("未收到原请求回执。");
-      accept(result.receipt, original);
+      const options = { signal: requestSignal(ui.signal, connection) };
+      if (original.receiptId) {
+        const result = await connection.workbench.request(
+          {
+            op: "receipt",
+            id: original.receiptId,
+            sessionId: target.sessionId,
+          },
+          options,
+        );
+        if (result.kind !== "receipt") throw new Error("未收到原请求回执。");
+        if (accept(result.receipt, original) && alive()) return original.text;
+      } else if (original.target) {
+        const result = await connection.services.request(
+          {
+            op: "input.lookup",
+            original: {
+              target: original.target,
+              input: {
+                requestId: original.requestId,
+                text: original.text,
+                mode: original.mode,
+              },
+            },
+          },
+          options,
+        );
+        if (result.receipt) {
+          if (accept(result.receipt, original) && alive()) return original.text;
+        } else if (alive())
+          setError(
+            "尚未找到原请求回执，请稍后再次核对。原请求仍保留，不能据此重发。",
+          );
+      }
     } catch (reason) {
       if (alive()) setError(describeFailure(reason));
     } finally {

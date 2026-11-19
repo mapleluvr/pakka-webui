@@ -5,6 +5,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import type { ViewTarget } from "@pakka/webui-sdk";
 import { parseViewHref, viewHref } from "../host/links.js";
 import type {
   OpenView,
@@ -21,11 +22,13 @@ const address = (view: OpenView) =>
 export function useViewNavigation(
   registry: UiRegistry,
   snapshot: RegistrySnapshot,
+  prepare?: (target: ViewTarget) => Promise<void>,
 ) {
   const [active, setActive] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const known = useRef(new Set<string>());
+  const publications = useRef(snapshot.navigation);
   const fromRoute = useRef(new Set<string>());
   const scroll = useRef(new Map<string, number>());
   const route = useRef<() => void>(() => {});
@@ -53,7 +56,26 @@ export function useViewNavigation(
     },
     [registry],
   );
+  useEffect(
+    () =>
+      registry.onClose((view) => {
+        if (activeRef.current !== view.id) return;
+        select(
+          registry
+            .getSnapshot()
+            .instances.filter(
+              (item) =>
+                item.placement === "page" || item.placement === "settings",
+            )
+            .at(-1)?.id ?? null,
+          "replace",
+        );
+      }),
+    [registry, select],
+  );
   useEffect(() => {
+    const publicationChanged = publications.current !== snapshot.navigation;
+    publications.current = snapshot.navigation;
     const created = snapshot.instances.filter(
       (view) =>
         !known.current.has(view.id) &&
@@ -63,19 +85,26 @@ export function useViewNavigation(
     const last = created.at(-1);
     if (last)
       select(last.id, fromRoute.current.delete(last.id) ? "existing" : "push");
-    else if (activeRef.current && !known.current.has(activeRef.current))
-      select(
-        snapshot.instances
-          .filter(
-            (view) =>
-              view.placement === "page" || view.placement === "settings",
-          )
-          .at(-1)?.id ?? null,
-        "replace",
-      );
+    else if (activeRef.current && !known.current.has(activeRef.current)) {
+      if (publicationChanged) {
+        // Keep the stable destination while a connection/publication is unavailable.
+        activeRef.current = null;
+        setActive(null);
+        setUnavailable("此界面尚未装载，请先连接 Pakka 或核对插件状态。");
+      } else
+        select(
+          snapshot.instances
+            .filter(
+              (view) =>
+                view.placement === "page" || view.placement === "settings",
+            )
+            .at(-1)?.id ?? null,
+          "replace",
+        );
+    }
     for (const id of scroll.current.keys())
       if (!known.current.has(id)) scroll.current.delete(id);
-  }, [snapshot.instances, select]);
+  }, [snapshot.instances, snapshot.navigation, select]);
   useEffect(() => {
     route.current = () => {
       if (!location.hash || location.hash === "#/") {
@@ -100,6 +129,16 @@ export function useViewNavigation(
           activeRef.current = null;
           setActive(null);
           setUnavailable("此界面尚未装载，请先连接 Pakka 或核对插件状态。");
+          if (prepare)
+            void prepare(target)
+              .then(() => {
+                if (location.hash === href && registry.hasView(target))
+                  route.current();
+              })
+              .catch(() => {
+                if (location.hash === href)
+                  setUnavailable("原资源或插件当前不可用，请核对权限后刷新。");
+              });
           return;
         }
         const id = registry.open(target);
@@ -118,7 +157,7 @@ export function useViewNavigation(
       window.removeEventListener("hashchange", update);
       window.removeEventListener("popstate", update);
     };
-  }, [registry, snapshot.navigation, select]);
+  }, [registry, snapshot.navigation, select, prepare]);
   useEffect(() => {
     const frame = requestAnimationFrame(() =>
       window.scrollTo({

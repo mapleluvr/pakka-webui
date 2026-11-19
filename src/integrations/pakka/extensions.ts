@@ -1,17 +1,20 @@
-import type { ComponentType } from "react";
+import { createElement, type ComponentType } from "react";
 import {
   assertUiRuntime,
   defineUiPlugin,
   type UiContext,
   type UiViewProps,
+  type ViewTarget,
 } from "@pakka/webui-sdk";
 import {
   bindExtensionService,
   type ExtensionServiceBinding,
 } from "@pakka/client/extensions";
 import type { ExtensionRegistration } from "@pakka/protocol/extensions";
+import type { AgentRef } from "@pakka/protocol/pocket";
 import type { UiRegistry } from "../../host/registry.js";
 import { requestSignal, type PakkaConnection } from "./connection.js";
+import { conversationReference, conversationResource } from "./resources.js";
 
 /** Integration namespace avoids collisions with bundled and GUI-only contributions. */
 export const extensionUiId = (id: string) => `extension:${id}`;
@@ -60,16 +63,47 @@ async function moduleAt(
   }
 }
 
-/** Authorized app-scoped contributions. Importing trusted code is not a browser sandbox. */
+interface ConversationExtensionScope {
+  readonly target: AgentRef;
+  readonly signal: AbortSignal;
+  readonly instanceId: string;
+  readonly changed?: () => void;
+}
+export interface PakkaExtensions {
+  refresh(): Promise<void>;
+  prepare(target: ViewTarget): Promise<void>;
+  views(): readonly {
+    plugin: string;
+    view: string;
+    title: string;
+    placement: "page" | "panel" | "sheet" | "settings";
+  }[];
+  forConversation(scope: ConversationExtensionScope): PakkaExtensions;
+  dispose(): void;
+}
+
+/** Authorized app or explicit Conversation contributions. Importing trusted code is not a browser sandbox. */
 export function attachPakkaExtensions(
   connection: PakkaConnection,
   registry: UiRegistry,
-) {
+  scope?: ConversationExtensionScope,
+): PakkaExtensions {
   const lifetime = new AbortController();
-  const signal = requestSignal(lifetime.signal, connection);
+  const signal = requestSignal(
+    AbortSignal.any([lifetime.signal, ...(scope ? [scope.signal] : [])]),
+    connection,
+  );
+  const pluginId = (id: string) =>
+    scope ? `conversation:${scope.instanceId}:${id}` : extensionUiId(id);
   const publications = new Map<string, string>();
+  const children = new Set<PakkaExtensions>();
+  const restored = new Map<
+    string,
+    { resource: string; loading: Promise<void> }
+  >();
   const failures = new Set<string>();
   let backend = new Map<string, ExtensionRegistration>();
+  let discovered = new Map<string, ExtensionRegistration>();
   let refreshing: Promise<void> | null = null;
   function report(id: string, generation: string, reason: unknown) {
     const key = `${id}:${generation}`;
@@ -82,14 +116,14 @@ export function attachPakkaExtensions(
   }
   function remove(id: string) {
     publications.delete(id);
-    registry.remove(extensionUiId(id));
+    registry.remove(pluginId(id));
   }
   async function publish(row: ExtensionRegistration) {
     const requirement = row.manifest.facets.webui;
     assertUiRuntime(requirement);
     if (!requirement) throw new Error("UI 声明缺失。");
     const views = row.manifest.interfaces.filter(
-      (view) => view.scope === "app",
+      (view) => view.scope === (scope ? "conversation" : "app"),
     );
     if (!views.length) return;
     const publication = new AbortController();
@@ -107,6 +141,7 @@ export function attachPakkaExtensions(
           "webui",
           row.generation,
           path,
+          scope?.target,
         );
       const [module] = await Promise.all([
         moduleAt(url(requirement.entry), loading),
@@ -117,7 +152,7 @@ export function attachPakkaExtensions(
         ),
       ]);
       active.throwIfAborted();
-      const id = extensionUiId(row.manifest.id);
+      const id = pluginId(row.manifest.id);
       const plugin = defineUiPlugin<ExtensionServiceBinding>({
         api: requirement.api,
         runtime: requirement.runtime,
@@ -137,10 +172,25 @@ export function attachPakkaExtensions(
             id: view.id,
             title: view.title,
             placement: view.slot,
-            navigation: view.navigation,
-            render: component as ComponentType<
-              UiViewProps<ExtensionServiceBinding>
-            >,
+            navigation: scope ? false : view.navigation,
+            render: (props: UiViewProps<ExtensionServiceBinding>) => {
+              if (scope) {
+                const reference =
+                  props.ui.resource && conversationReference(props.ui.resource);
+                if (
+                  !reference ||
+                  reference.sessionId !== scope.target.sessionId ||
+                  reference.conversationId !== scope.target.conversationId
+                )
+                  throw new Error("插件地址与服务绑定的 Conversation 不符。");
+              }
+              return createElement(
+                component as ComponentType<
+                  UiViewProps<ExtensionServiceBinding>
+                >,
+                props,
+              );
+            },
           };
         }),
         commands: row.manifest.commands.flatMap((command) => {
@@ -155,7 +205,13 @@ export function attachPakkaExtensions(
                 text: string,
               ) {
                 if (text.trim()) throw new Error("此界面命令不接受参数。");
-                await ui.open({ plugin: id, view: view.id });
+                await ui.open({
+                  plugin: id,
+                  view: view.id,
+                  ...(scope
+                    ? { resource: conversationResource(scope.target) }
+                    : {}),
+                });
               },
             },
           ];
@@ -166,6 +222,7 @@ export function attachPakkaExtensions(
         personId: connection.person.id,
         serverId: connection.serverId,
         signal: active,
+        ...(scope ? { target: scope.target } : {}),
         backend: () => backend.get(row.manifest.id),
       });
       registry.publish({
@@ -181,7 +238,7 @@ export function attachPakkaExtensions(
     }
   }
   async function synchronize() {
-    const rows = await connection.extensions.list(undefined, { signal });
+    const rows = await connection.extensions.list(scope?.target, { signal });
     signal.throwIfAborted();
     backend = new Map(
       rows
@@ -193,6 +250,7 @@ export function attachPakkaExtensions(
         .filter((row) => row.facet === "webui")
         .map((row) => [row.manifest.id, row]),
     );
+    discovered = webui;
     for (const [id, generation] of publications) {
       const current = webui.get(id);
       if (
@@ -223,10 +281,30 @@ export function attachPakkaExtensions(
   }
   function refresh() {
     if (signal.aborted) return Promise.resolve();
-    refreshing ??= synchronize().finally(() => {
-      refreshing = null;
-    });
-    return refreshing;
+    // A control may have completed after the active discovery request began.
+    // Each caller waits for its own read; older results cannot satisfy that synchronization.
+    const current = (refreshing ?? Promise.resolve())
+      .catch(() => {
+        /* A failed earlier read does not prevent a new authorized attempt. */
+      })
+      .then(async () => {
+        if (!signal.aborted) {
+          try {
+            await synchronize();
+          } catch (error) {
+            if (scope) for (const id of [...publications.keys()]) remove(id);
+            throw error;
+          } finally {
+            scope?.changed?.();
+          }
+          await Promise.all([...children].map((child) => child.refresh()));
+        }
+      })
+      .finally(() => {
+        if (refreshing === current) refreshing = null;
+      });
+    refreshing = current;
+    return current;
   }
   const update = () => {
     if (document.visibilityState === "visible")
@@ -238,11 +316,114 @@ export function attachPakkaExtensions(
   window.addEventListener("focus", update);
   return {
     refresh,
+    async prepare(destination) {
+      if (registry.hasView(destination) || scope) return;
+      const match =
+        /^conversation:([a-f0-9-]{36}):([a-zA-Z0-9][a-zA-Z0-9._-]*)$/.exec(
+          destination.plugin,
+        );
+      if (!match || !destination.resource) return;
+      const reference = conversationReference(destination.resource);
+      const resource = JSON.stringify([
+        reference.sessionId,
+        reference.conversationId,
+      ]);
+      const previous = restored.get(match[1]!);
+      if (previous) {
+        if (previous.resource !== resource)
+          throw new Error("插件地址的 Conversation 身份不符。");
+        await previous.loading;
+        return;
+      }
+      const loading = (async () => {
+        const { resolution } = await connection.services.request(
+          { op: "resource.resolve", reference },
+          { signal },
+        );
+        signal.throwIfAborted();
+        if (resolution.status !== "loaded")
+          throw new Error("原 Conversation 当前不可用于此插件。");
+        const owner = match[1]!;
+        const child = attachPakkaExtensions(connection, registry, {
+          target: resolution.target,
+          signal,
+          instanceId: owner,
+        });
+        let unsubscribe = () => {};
+        const owned: PakkaExtensions = {
+          ...child,
+          dispose() {
+            unsubscribe();
+            restored.delete(owner);
+            children.delete(owned);
+            child.dispose();
+          },
+        };
+        const prefix = `conversation:${owner}:`;
+        unsubscribe = registry.onClose((view) => {
+          if (
+            view.plugin.startsWith(prefix) &&
+            !registry
+              .getSnapshot()
+              .instances.some((item) => item.plugin.startsWith(prefix))
+          )
+            owned.dispose();
+        });
+        children.add(owned);
+        try {
+          await owned.refresh();
+        } catch (reason) {
+          owned.dispose();
+          throw reason;
+        }
+      })();
+      restored.set(match[1]!, { resource, loading });
+      try {
+        await loading;
+      } catch (reason) {
+        restored.delete(match[1]!);
+        throw reason;
+      }
+    },
+    forConversation(input) {
+      const child = attachPakkaExtensions(connection, registry, input);
+      const owned = {
+        ...child,
+        dispose() {
+          children.delete(owned);
+          child.dispose();
+        },
+      };
+      children.add(owned);
+      return owned;
+    },
+    views() {
+      return [...publications.keys()].flatMap((id) => {
+        const row = discovered.get(id);
+        return (
+          row?.manifest.interfaces
+            .filter((view) => view.scope === "conversation")
+            .map((view) => ({
+              plugin: pluginId(id),
+              view: view.id,
+              title: view.title,
+              placement: view.slot,
+            })) ?? []
+        );
+      });
+    },
     dispose() {
       lifetime.abort();
       window.clearInterval(timer);
       window.removeEventListener("focus", update);
       const errors: unknown[] = [];
+      for (const child of [...children]) {
+        try {
+          child.dispose();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
       for (const id of [...publications.keys()])
         try {
           remove(id);

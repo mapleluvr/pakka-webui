@@ -1,41 +1,100 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { defineUiPlugin } from "@pakka/webui-sdk";
-import { createUiRegistry } from "../host/registry.js";
+import {
+  defineUiPlugin,
+  type UiViewProps,
+  type ViewTarget,
+} from "@pakka/webui-sdk";
+import { createUiRegistry, type UiRegistry } from "../host/registry.js";
 import { playground } from "../plugins/playground.js";
-import { modelSettings } from "../features/settings/plugin.js";
+import {
+  modelSettings,
+  sessionSettings,
+  extensionSettings,
+  notificationSettings,
+  appearanceSettings,
+} from "../features/settings/plugin.js";
 import { WorkspaceView } from "../features/conversations/WorkspaceView.js";
 import { ConversationView } from "../features/conversations/ConversationView.js";
+import { PeopleView } from "../features/identity/PeopleView.js";
 import {
   takeLoginCredential,
   usePakkaConnection,
 } from "../features/identity/usePakkaConnection.js";
 import { conversationReference } from "../integrations/pakka/resources.js";
 import type { PakkaConnection } from "../integrations/pakka/connection.js";
-import { attachPakkaExtensions } from "../integrations/pakka/extensions.js";
+import {
+  registerNotificationWorker,
+  notificationWorkerCommand,
+} from "../integrations/pakka/notification-browser.js";
+import {
+  attachPakkaExtensions,
+  type PakkaExtensions,
+} from "../integrations/pakka/extensions.js";
+import { ConversationExtensions } from "../integrations/pakka/ConversationExtensions.js";
 import { Application } from "./Application.js";
 import "./style.css";
 
-const conversations = defineUiPlugin<PakkaConnection>({
+function conversationPlugin(extensions: PakkaExtensions, registry: UiRegistry) {
+  function History(props: UiViewProps<PakkaConnection>) {
+    const title = useCallback(
+      (name: string) => {
+        if (!props.ui.signal.aborted)
+          registry.setTitle(props.ui.instanceId, name);
+      },
+      [props.ui],
+    );
+    return (
+      <ConversationView
+        {...props}
+        onTitle={title}
+        contributions={(target) => (
+          <ConversationExtensions
+            ui={props.ui}
+            target={target}
+            extensions={extensions}
+          />
+        )}
+      />
+    );
+  }
+  return defineUiPlugin<PakkaConnection>({
+    api: 1,
+    runtime: "react19-astryx0.7.15",
+    id: "conversations",
+    version: "0.1.0",
+    title: "Conversations",
+    views: [
+      {
+        id: "workspace",
+        title: "Conversations",
+        placement: "page",
+        navigation: true,
+        render: WorkspaceView,
+      },
+      {
+        id: "history",
+        title: "Conversation",
+        placement: "page",
+        resourceTypes: [{ source: "pakka", type: "conversation" }],
+        render: History,
+      },
+    ],
+  });
+}
+const peopleSettings = defineUiPlugin<PakkaConnection>({
   api: 1,
   runtime: "react19-astryx0.7.15",
-  id: "conversations",
+  id: "people-settings",
   version: "0.1.0",
-  title: "Conversations",
+  title: "人员与邀请",
   views: [
     {
-      id: "workspace",
-      title: "Conversations",
-      placement: "page",
+      id: "people",
+      title: "人员与邀请",
+      placement: "settings",
       navigation: true,
-      render: WorkspaceView,
-    },
-    {
-      id: "history",
-      title: "Conversation",
-      placement: "page",
-      resourceTypes: [{ source: "pakka", type: "conversation" }],
-      render: ConversationView,
+      render: PeopleView,
     },
   ],
 });
@@ -47,9 +106,15 @@ function Root() {
     null,
   );
   current.current = identity.connection;
+  const notificationPerson = useRef<string | null | undefined>(undefined);
   const [registry] = useState(() => {
     const host = createUiRegistry({
       title: (target, fallback) => {
+        if (
+          target.resource?.source === "pakka" &&
+          target.resource.type === "session"
+        )
+          return `${fallback} · ${target.resource.id.slice(0, 8)}`;
         if (
           target.resource?.source !== "pakka" ||
           target.resource.type !== "conversation"
@@ -96,6 +161,11 @@ function Root() {
       },
     });
     host.publish({
+      plugin: appearanceSettings,
+      generation: "bundled-0.1.0",
+      bindings: undefined,
+    });
+    host.publish({
       plugin: playground,
       generation: "bundled-0.1.0",
       bindings: undefined,
@@ -103,17 +173,71 @@ function Root() {
     return host;
   });
   useEffect(() => {
+    if (!isSecureContext || !("serviceWorker" in navigator)) return;
+    let active = true;
+    let notice: string | undefined;
+    void registerNotificationWorker().catch(() => {
+      if (active)
+        notice = registry.notice({
+          tone: "warning",
+          message:
+            "通知 worker 未能加载，请在通知设置中核对；这不影响模型工作。",
+        });
+    });
+    return () => {
+      active = false;
+      if (notice) registry.dismiss(notice);
+    };
+  }, [registry]);
+  useEffect(() => {
+    const personId = identity.connection?.person.id ?? null;
+    if (notificationPerson.current === personId) return;
+    notificationPerson.current = personId;
+    if (!isSecureContext || !("serviceWorker" in navigator)) return;
+    let active = true;
+    let notice: string | undefined;
+    void notificationWorkerCommand("clear").catch(() => {
+      if (active)
+        notice = registry.notice({
+          tone: "warning",
+          message: "已显示的系统通知清理未得到确认，请检查浏览器通知区。",
+        });
+    });
+    return () => {
+      active = false;
+      if (notice) registry.dismiss(notice);
+    };
+  }, [identity.connection?.person.id, registry]);
+  useEffect(() => {
     const connection = identity.connection;
     if (!connection) return;
-    const plugins = [conversations, modelSettings(connection)];
+    const attached = attachPakkaExtensions(connection, registry);
+    const conversations = conversationPlugin(attached, registry);
+    const plugins = [
+      conversations,
+      modelSettings(connection),
+      notificationSettings,
+      ...(connection.person.role === "admin" ? [sessionSettings] : []),
+      ...(connection.person.role === "admin" &&
+      connection.person.resources === "*"
+        ? [peopleSettings]
+        : []),
+    ];
     for (const plugin of plugins)
       registry.publish({
         plugin,
         generation: connection.identity,
         bindings: connection,
       });
-    const attached = attachPakkaExtensions(connection, registry);
     extensions.current = attached;
+    const manageExtensions =
+      connection.person.role === "admin" && connection.person.resources === "*";
+    if (manageExtensions)
+      registry.publish({
+        plugin: extensionSettings,
+        generation: connection.identity,
+        bindings: { connection, synchronize: attached.refresh },
+      });
     void attached.refresh().catch(() => {
       if (!connection.signal.aborted)
         registry.notice({
@@ -128,6 +252,13 @@ function Root() {
       } catch {
         /* Registry retains and reports cleanup failures. */
       }
+      if (manageExtensions) {
+        try {
+          registry.remove(extensionSettings.id);
+        } catch {
+          /* Registry retains and reports the cleanup failure. */
+        }
+      }
       for (const plugin of plugins) {
         try {
           registry.remove(plugin.id);
@@ -138,8 +269,9 @@ function Root() {
     };
   }, [identity.connection, registry]);
   useEffect(() => {
-    if (identity.error)
-      registry.notice({ tone: "warning", message: identity.error });
+    if (!identity.error) return;
+    const id = registry.notice({ tone: "warning", message: identity.error });
+    return () => registry.dismiss(id);
   }, [identity.error, registry]);
   useEffect(
     () => () => {
@@ -151,9 +283,16 @@ function Root() {
     },
     [registry],
   );
+  const prepareView = useCallback(
+    async (target: ViewTarget) => {
+      await extensions.current?.prepare(target);
+    },
+    [identity.connection],
+  );
   return (
     <Application
       registry={registry}
+      prepareView={prepareView}
       identity={identity}
       initialCredential={initialCredential}
       refreshExtensions={async () => {

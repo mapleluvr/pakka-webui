@@ -87,6 +87,7 @@ async function loadAssets() {
     .join("");
   return {
     assets,
+    workers: new Set(manifest.workers),
     policy: `default-src 'self'; script-src 'self' 'sha256-${hash}'; style-src 'self'${stylePolicy}; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`,
   };
 }
@@ -145,6 +146,8 @@ const server = createServer((req, res) => {
   if (asset) {
     if (req.method !== "GET" && req.method !== "HEAD")
       return reject(405, "Read-only static asset");
+    if (current.workers.has(url.pathname))
+      res.setHeader("Service-Worker-Allowed", "/");
     res.writeHead(200, {
       "Content-Type": asset.type,
       "Content-Length": asset.bytes.length,

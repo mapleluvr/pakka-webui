@@ -1,0 +1,109 @@
+.mobile-workspace-heading {
+  display: none;
+}
+.workspace-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+.nav-caption {
+  margin: 0 10px 6px;
+  color: var(--app-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.nav-list a[aria-current] {
+  color: var(--app-accent);
+  background: var(--color-background-muted);
+}
+.open-views {
+  display: grid;
+  gap: 4px;
+}
+.open-view-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 8px;
+}
+.open-view-row[data-active] {
+  background: var(--color-background-muted);
+}
+.open-view-button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 10px;
+  background: transparent;
+  color: var(--app-text);
+  text-align: left;
+  font-size: 0.85rem;
+}
+.open-view-button > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.open-view-button[aria-current] {
+  color: var(--app-accent);
+  font-weight: 600;
+}
+.open-view-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}
+.open-view-button[aria-current] .open-view-mark {
+  background: currentColor;
+}
+.open-view-close {
+  flex-shrink: 0;
+}
+.nav-settings {
+  border-top: 1px solid var(--app-line);
+  padding-top: 8px;
+}
+.nav-settings summary {
+  padding-inline: 10px;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+.sidebar > .identity {
+  margin-top: 0;
+  border-top: 1px solid var(--app-line);
+  padding-top: 12px;
+}
+.navigation-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: min(90dvh, 760px);
+  max-width: 100%;
+  padding: 16px;
+  gap: 12px;
+}
+.navigation-sheet > .pane-heading {
+  margin-bottom: 0;
+}
+.navigation-sheet > .identity {
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .mobile-workspace-heading {
+    display: flex;
+    height: 56px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--app-line);
+    background: var(--app-surface);
+  }
+}
