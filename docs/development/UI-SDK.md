@@ -64,7 +64,9 @@ export const plugin = defineUiPlugin({
 
 `UiContext` 提供 `notice`、`open`、`navigate`、`dispatch`、`close` 和 `onDispose`。资源解析结果区分 ready、unloaded、unavailable、forbidden、identity-mismatch、unsupported；宿主不从 opaque id 猜测数据库路径或 Pakka URL。Pakka 接入层将自己的 typed Session/Conversation 引用交给公开服务，再适配到 UI 来源。
 
-应用 registry 实现命名空间命令；Conversation 输入的模型/Thinking 与 extension slash 解析属于各功能及 Pakka 接入层。它们调用相同业务操作，不成为 UI SDK 内置的模型命令。未启用、歧义或尚未接入的已声明 extension 命令会明确拒绝，不作为普通模型消息提交。
+应用 registry 实现命名空间命令；Conversation 输入的模型/Thinking 与 extension slash 解析属于各功能及 Pakka 接入层。界面命令通过 registry 打开所属实例；Backend action 按公开 schema 校验 JSON 参数，使用其 generation、effect 与 App/Conversation 作用域。普通路径及未注册 slash 文本按原消息发送，发现失败保留疑似命令参数，未启用或歧义的已声明命令明确拒绝。
+
+write/model 命令发送前保存完整原请求，App 待核对记录在同一来源/Person 的标签页内共享，Conversation 记录按原 Session/Conversation 隔离。丢响应只查询原 operation；unknown 保持待核对，新写草稿保留。effect read 不产生持久 operation，读取失败可由用户重新读取。命令返回值与后续业务工作状态分别呈现。
 
 ## 实例与服务的生命周期
 

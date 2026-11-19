@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -41,12 +41,15 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
   const [resolving, setResolving] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [reopening, setReopening] = useState<string | null>(null);
+  const [awaitingReopenRead, setAwaitingReopenRead] = useState(false);
+  const reopenCheck = useRef<{ id: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const change = useWorkspaceChange(ui, bindings, "workspace");
   const blocked = change.busy || !!change.pending;
   const alive = () => !ui.signal.aborted && !bindings.signal.aborted;
   useEffect(() => {
     const controller = new AbortController();
+    const checkingReopen = reopenCheck.current;
     const signal = AbortSignal.any([
       controller.signal,
       requestSignal(ui.signal, bindings),
@@ -69,6 +72,16 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
         setListing(list);
         setSessions(sessionList);
         setNavigation(personal.view);
+        if (checkingReopen && reopenCheck.current === checkingReopen) {
+          reopenCheck.current = null;
+          setAwaitingReopenRead(false);
+          setNotice(
+            sessionList.sessions.find((row) => row.id === checkingReopen.id)
+              ?.status === "ready"
+              ? "原 Session 已重新打开。"
+              : "已重新读取 Session 状态，请按当前状态继续。",
+          );
+        }
       })
       .catch((reason) => {
         if (!signal.aborted) {
@@ -170,7 +183,7 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
       );
   }
   async function reopen(id: string) {
-    if (reopening) return;
+    if (reopening || awaitingReopenRead || loading) return;
     setReopening(id);
     setError(null);
     try {
@@ -186,14 +199,27 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
             ? "原 Session 已重新打开。"
             : "Session 状态仍需核对。",
         );
+        setSessions((current) =>
+          current
+            ? {
+                ...current,
+                sessions: current.sessions.map((row) =>
+                  row.id === id ? result.session : row,
+                ),
+              }
+            : current,
+        );
         setRefresh((value) => value + 1);
-        setReopening(null);
       }
     } catch (reason) {
-      if (alive())
-        setError(
-          `重开结果未确认，请刷新 Session 状态后核对。${describeFailure(reason)}`,
-        );
+      if (alive()) {
+        reopenCheck.current = { id };
+        setAwaitingReopenRead(true);
+        setNotice("重开结果未确认，请刷新工作台核对原 Session 状态。");
+        setError(describeFailure(reason));
+      }
+    } finally {
+      if (alive()) setReopening(null);
     }
   }
   const rows = (listing?.navigation ?? [])
@@ -330,7 +356,7 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
               {selectedSession.problem?.canReopen && sessions.canCreate && (
                 <Button
                   label="重新打开原 Session"
-                  isDisabled={!!reopening}
+                  isDisabled={!!reopening || awaitingReopenRead || loading}
                   onClick={() => {
                     void reopen(selectedSession.id);
                   }}

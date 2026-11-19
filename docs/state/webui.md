@@ -42,6 +42,7 @@ host 消费显式注入的贡献、解析器和能力；Pakka URL 与服务实�
 - 插件可以提供导航、page、sheet/panel、设置与完整自定义 React 内容，并直接使用 Astryx 的公开组件、parts、hooks、props 和类型。
 - 宿主与插件共享 React/ReactDOM/JSX、Astryx 及所需 StyleX runtime、主题和浮层环境。普通 HTML、局部 CSS/SVG、自定义组件与有实际用途的局部主题可组合。
 - 贡献声明、服务调用、命名空间命令和有限观察走公开接口。服务绑定承担 actor/resource 授权；界面容器承担打开、关闭、焦点、错误和清理。
+- Conversation 输入按当前资源发现精确 slash/namespace 命令；Backend action 校验 JSON 参数、声明的作用域与 effect。命令发现失败保留疑似命令参数，普通路径文本仍可发送。write/model 命令的原请求在发送前保存，App 记录按来源/Person 共享，Conversation 记录按原 Session/Conversation 隔离；丢响应只查询原回执，unknown 保留。read 命令不产生持久回执，失败可重新读取。
 - 每个 facet 具有独立的 version、generation 和 phase；服务调用、资产和控制按对应 facet 身份接线。WebUI publication 拥有其实例集合；Backend/Client/Agent 的状态变化各自处理。设置页逐项保留原请求，历史控制回执与重新读取的当前状态分开显示；unknown 或未找到结果不释放新控制。控制后的宿主同步须读取控制之后的发现结果，完成前核对所属实例清理，不能复用控制前已发出的读取。
 - 实例绑定插件身份、版本/generation、资源与 open-instance。替换时清理所属订阅、监听、计时器与可中止读取，旧实例的结果不能进入新实例。清理失败保留并报告同一次结果；已接纳工作由所属服务接续。
 

@@ -22,6 +22,7 @@ import {
 } from "./ModelPicker.js";
 import { dispatchExtensionCommand } from "../../integrations/pakka/extensions.js";
 import { useConversationConfiguration } from "./useConversationConfiguration.js";
+import { useExtensionCommand } from "./useExtensionCommand.js";
 import { ConversationSettings } from "./ConversationSettings.js";
 import {
   useConversationInput,
@@ -49,10 +50,13 @@ export function Composer({
 }) {
   const config = useConversationConfiguration(ui, connection, target, changed);
   const delivery = useConversationInput(ui, connection, target, changed);
+  const extensionCommand = useExtensionCommand(ui, connection, target, changed);
   const [draft, setDraft] = useState(() =>
     delivery.pending && delivery.pending !== "unreadable"
       ? delivery.pending.text
-      : "",
+      : extensionCommand.pending && extensionCommand.pending !== "unreadable"
+        ? extensionCommand.pending.text
+        : "",
   );
   const [mode, setMode] = useState<InputMode>(() =>
     delivery.pending && delivery.pending !== "unreadable"
@@ -68,7 +72,12 @@ export function Composer({
     () => AbortSignal.any([ui.signal, connection.signal]),
     [ui.signal, connection.signal],
   );
-  const busy = disabled || config.busy || delivery.busy || resolving;
+  const busy =
+    disabled ||
+    config.busy ||
+    delivery.busy ||
+    extensionCommand.busy ||
+    resolving;
   const configurable =
     !!config.configuration?.canConfigure &&
     config.supportsRequests &&
@@ -109,7 +118,8 @@ export function Composer({
       config.unconfirmed ||
       commandPending.current ||
       !draft.trim() ||
-      delivery.pending
+      delivery.pending ||
+      extensionCommand.pending
     )
       return;
     const text = draft.trim();
@@ -150,18 +160,26 @@ export function Composer({
       commandPending.current = true;
       setResolving(true);
       try {
-        const handled = await dispatchExtensionCommand(connection, ui, text);
-        if (alive()) {
-          if (handled) setDraft("");
-          else setError("此命令尚未注册，不会作为消息发给模型。");
+        const handled = await dispatchExtensionCommand(
+          connection,
+          ui,
+          text,
+          config.currentTarget(),
+          (call, title, effect) =>
+            extensionCommand.run(call, draft, title, effect),
+        );
+        if (!alive()) return;
+        if (handled) {
+          setDraft((current) => (current === draft ? "" : current));
+          return;
         }
       } catch (reason) {
         if (alive()) setError(describeFailure(reason));
+        return;
       } finally {
         commandPending.current = false;
         if (alive()) setResolving(false);
       }
-      return;
     }
     if (await delivery.submit(config.currentTarget(), draft, mode)) {
       setDraft((current) => (current === draft ? "" : current));
@@ -203,7 +221,12 @@ export function Composer({
           key={JSON.stringify(config.currentTarget())}
           box={input}
           signal={dictationSignal}
-          enabled={!busy && !config.unconfirmed && !delivery.pending}
+          enabled={
+            !busy &&
+            !config.unconfirmed &&
+            !delivery.pending &&
+            !extensionCommand.pending
+          }
           onText={setDraft}
         />
       </div>
@@ -271,7 +294,11 @@ export function Composer({
             label={busy ? "正在处理…" : inputModeLabel[mode]}
             type="submit"
             isDisabled={
-              busy || config.unconfirmed || !draft.trim() || !!delivery.pending
+              busy ||
+              config.unconfirmed ||
+              !draft.trim() ||
+              !!delivery.pending ||
+              !!extensionCommand.pending
             }
           />
         </div>
@@ -281,10 +308,61 @@ export function Composer({
           调整消息会在下一次可介入时送达。后续消息在本轮工作结束后执行。
         </p>
       )}
-      {(error ?? config.error ?? delivery.error) && (
+      {(error ?? config.error ?? delivery.error ?? extensionCommand.error) && (
         <p role="alert" className="error-text">
-          {error ?? config.error ?? delivery.error}
+          {error ?? config.error ?? delivery.error ?? extensionCommand.error}
         </p>
+      )}
+      {extensionCommand.result && (
+        <details className="pending-input-original command-result">
+          <summary>
+            命令已返回 · {extensionCommand.result.original.title}
+          </summary>
+          <p className="muted">
+            这里只确认命令返回；后续工作的状态请在所属页面核对。
+          </p>
+          <pre>
+            {JSON.stringify(extensionCommand.result.operation.value, null, 2)}
+          </pre>
+          <p className="identifier">
+            原请求 {extensionCommand.result.original.requestId}
+          </p>
+        </details>
+      )}
+      {extensionCommand.pending && (
+        <div
+          role="status"
+          className="input-pending flow compact command-pending"
+        >
+          {extensionCommand.pending === "unreadable" ? (
+            <p>本地命令原请求不可读。请保留记录，当前已阻止重复提交。</p>
+          ) : (
+            <>
+              <p>命令结果尚未确认，已保留原请求并阻止重复提交。</p>
+              <details className="pending-input-original">
+                <summary>原命令 · {extensionCommand.pending.title}</summary>
+                <pre>{extensionCommand.pending.text}</pre>
+                <p className="identifier">
+                  原请求 {extensionCommand.pending.requestId}
+                </p>
+              </details>
+              <Button
+                label="核对命令原请求"
+                variant="ghost"
+                isDisabled={extensionCommand.busy}
+                onClick={() => {
+                  setError(null);
+                  void extensionCommand.check().then((acceptedText) => {
+                    if (alive() && acceptedText !== undefined)
+                      setDraft((current) =>
+                        current === acceptedText ? "" : current,
+                      );
+                  });
+                }}
+              />
+            </>
+          )}
+        </div>
       )}
       {delivery.receipt && (
         <p role="status" className="muted">

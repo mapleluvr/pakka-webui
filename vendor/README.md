@@ -9,4 +9,4 @@
 
 归档以内容身份命名，`package-lock.json` 同时锁定完整 integrity。纯 UI SDK 独立于这些应用开发依赖；包版本相同仍须核对精确候选字节。
 
-阶段 3 的两份已跟踪归档保留历史身份：`pakka-client-96236109a3fb92a3.tgz` 与 `pakka-protocol-c57ec7c43f2d8156.tgz`，对应[阶段 2 公开包记录](../docs/verification/PHASE-2.md)及[阶段 3 应用记录](../docs/verification/PHASE-3.md)。中间未选用的本地归档已移到仓库外保全目录；当前安装仅引用表中的两份归档。
+阶段 3 的两份旧归档已没有当前消费者，从当前树退出；其原始字节仍由 [Git 历史](https://github.com/mapleluvr/pakka-webui/tree/639397d7a7dd42875dd928d09d259d299b817e6f/vendor)保全，对应[阶段 2 公开包记录](../docs/verification/PHASE-2.md)及[阶段 3 应用记录](../docs/verification/PHASE-3.md)。当前安装只引用表中的两份归档，中间与旧候选另在仓库外保留。

@@ -10,7 +10,12 @@ import {
   bindExtensionService,
   type ExtensionServiceBinding,
 } from "@pakka/client/extensions";
-import type { ExtensionRegistration } from "@pakka/protocol/extensions";
+import {
+  decodeValue,
+  type ExtensionAction,
+  type ExtensionCall,
+  type ExtensionRegistration,
+} from "@pakka/protocol/extensions";
 import type { AgentRef } from "@pakka/protocol/pocket";
 import type { UiRegistry } from "../../host/registry.js";
 import { requestSignal, type PakkaConnection } from "./connection.js";
@@ -441,35 +446,77 @@ export async function dispatchExtensionCommand(
   connection: PakkaConnection,
   ui: UiContext,
   text: string,
+  target: AgentRef,
+  execute: (
+    call: Omit<ExtensionCall, "requestId">,
+    title: string,
+    effect: ExtensionAction["effect"],
+  ) => Promise<void>,
 ): Promise<boolean> {
-  const match = /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(text);
+  const match =
+    /^\/((?:[a-z][a-z0-9-]{0,63}:)?[a-z][a-z0-9-]{0,63})(?:\s+([\s\S]*))?$/.exec(
+      text,
+    );
+  // Paths and other literal slash text do not depend on command discovery.
   if (!match) return false;
-  const rows = await connection.extensions.list(undefined, {
+  const rows = await connection.extensions.list(target, {
     signal: requestSignal(ui.signal, connection),
   });
   ui.signal.throwIfAborted();
   connection.signal.throwIfAborted();
-  const matches = rows
-    .filter((row) => row.facet === "webui")
-    .flatMap((row) =>
-      row.manifest.commands
-        .filter(
-          (command) =>
-            match[1] === command.slash ||
-            match[1] === `${row.manifest.id}:${command.slash}`,
-        )
-        .map((command) => ({ row, command })),
-    );
+  const matches = rows.flatMap((row) =>
+    row.manifest.commands
+      .filter(
+        (command) =>
+          match[1] === command.slash ||
+          match[1] === `${row.manifest.id}:${command.slash}`,
+      )
+      .map((command) => ({ row, command })),
+  );
   if (!matches.length) return false;
   if (matches.length !== 1)
     throw new Error("命令存在多个来源，请使用 /扩展ID:命令 的完整名称。");
   const { row, command } = matches[0]!;
-  if (row.phase !== "ready") throw new Error("此插件界面尚未启用。");
+  if (row.phase !== "ready") throw new Error("此命令所属 facet 尚未启用。");
+  if (command.action) {
+    const action = row.manifest.actions.find(
+      (action) => action.id === command.action,
+    );
+    if (row.facet !== "backend" || !action)
+      throw new Error("命令的 Backend action 声明不可用。");
+    let input;
+    try {
+      input = decodeValue(action.input, JSON.parse(match[2]?.trim() || "{}"));
+    } catch {
+      throw new Error("命令参数须是符合其声明的 JSON；原稿已保留。");
+    }
+    await execute(
+      {
+        extension: row.manifest.id,
+        generation: row.generation,
+        action: action.id,
+        input,
+        ...(action.scope === "conversation" ? { target } : {}),
+      },
+      command.title,
+      action.effect,
+    );
+    return true;
+  }
+  if (!command.interface) throw new Error("命令入口声明不可用。");
   assertUiRuntime(row.manifest.facets.webui);
-  if (!command.interface)
-    throw new Error("此服务命令尚未接入输入框，不会作为消息提交。");
+  const view = row.manifest.interfaces.find(
+    (view) => view.id === command.interface,
+  );
+  if (!view) throw new Error("命令界面声明不可用。");
   await ui.dispatch(
-    { plugin: extensionUiId(row.manifest.id), command: command.id },
+    {
+      plugin:
+        view.scope === "conversation"
+          ? `conversation:${ui.instanceId}:${row.manifest.id}`
+          : extensionUiId(row.manifest.id),
+      command: command.id,
+    },
     match[2] ?? "",
   );
   return true;

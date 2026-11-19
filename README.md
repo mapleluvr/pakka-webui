@@ -2,7 +2,7 @@
 
 Pakka 的独立浏览器应用与 UI 插件宿主，采用 React 19、TypeScript/TSX 与 Astryx，通过公开客户端和协议连接 Pakka。
 
-当前候选已形成**独立应用、通用插件 registry、纯 UI 示例、原历史浏览和模型设置切片**，并可装载 RSI 包提供的 React/Astryx 工单界面。阶段与验收范围见[工作入口](docs/OVERVIEW.md)；完整功能迁移和默认产品切换仍在后续阶段。
+应用提供 Conversation 工作台、原历史与工具阅读、输入和原请求恢复、模型/Thinking、人员与协作、通知、外观和通用插件 registry。RSI、MAS、文件/Git 等业务页面由所属插件接入。当前阶段与实际验收范围见[工作入口](docs/OVERVIEW.md)。
 
 ## 独立构建
 
@@ -31,7 +31,7 @@ npm run build
 npm run pack:app -- dist/delivery-candidate
 ```
 
-目标目录必须是新目录；命令构建完整应用，再通过 npm pack 输出固定内容 hash 的静态 tgz 与 `app-release.json`。归档包含 manifest 声明的资产、上游许可和私有 npm 元数据，不带后端依赖。Pakka 按获准的归档/manifest 摘要显式装配；SDK 仍单独交付，默认产品切换另行处理。详见[交付与配对](docs/development/DELIVERY.md)。
+目标目录必须是新目录；命令构建完整应用，再通过 npm pack 输出固定内容 hash 的静态 tgz 与 `app-release.json`。归档包含 manifest 声明的资产、上游许可和私有 npm 元数据，不带后端依赖。Pakka 默认装配选定归档并校验 manifest；可信宿主也可显式选择另一兼容制品。SDK 单独交付，默认组合由 Pakka 的配对记录维护。详见[交付与配对](docs/development/DELIVERY.md)。
 
 ## 本地开发
 

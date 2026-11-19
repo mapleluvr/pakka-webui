@@ -59,6 +59,6 @@ RSI 工单组件、草稿和领域 decoder 位于 Pakka 的 `@pakka/rsi` 包。�
 
 ## 固定制品与 CSP
 
-使用 `npm run pack:app -- <新目录>` 交付完整应用的固定静态 tgz；归档组成、摘要来源及更新流程见[应用交付](DELIVERY.md)。发布候选使用解包后的完整应用目录和其 manifest 的 SHA-256，由 Pakka 公开 Node 装配参数 `frontend: { directory, manifestSha256 }` 指定。Node 启动前校验 schema、服务兼容和每个文件的 hash。此动作是显式候选装配；默认产品切换、部署和发布分别处理。
+使用 `npm run pack:app -- <新目录>` 交付完整应用的固定静态 tgz；归档组成、摘要来源及更新流程见[应用交付](DELIVERY.md)。发布候选使用解包后的完整应用目录和其 manifest 的 SHA-256，由 Pakka 公开 Node 装配参数 `frontend: { directory, manifestSha256 }` 指定。Node 启动前校验 schema、服务兼容和每个文件的 hash。默认 Pakka 包在构建时已选定并装入固定前端；这个参数用于可信宿主显式选择另一个兼容制品。部署与 registry 发布按各自交付流程处理。
 
-阶段 4 开发组合为资产 schema 2、services 4、extensions 3、workbench 2，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
+当前支持组合为资产 schema 2、services 4、extensions 3、workbench 2，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
