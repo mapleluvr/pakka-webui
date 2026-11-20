@@ -1,13 +1,20 @@
 # 工作入口
 
-Pakka 的独立 WebUI 与通用 UI 插件宿主。当前采用的目标见 [WebUI state](state/webui.md)，仓库建立的范围与来源见[初始化记录](changes/repository-bootstrap.md)。
+Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的产品与架构见 [WebUI state](state/webui.md)，运行入口见 [README](../README.md)与[应用开发](development/APPLICATION.md)，插件能力见 [UI SDK](development/UI-SDK.md)。
 
-## 当前状态
+## 当前交付
 
-本仓处于初始化状态，仅有说明与开发约定。Pakka 侧已完成[阶段 0 消费盘点](https://github.com/mapleluvr/pakka/blob/29cb207ec7b305e2e0a559f3de30a7a21b490228/openspec/changes/plan-independent-webui/inventory.md)；独立协议/client/SDK、React/Astryx 真实宿主与功能迁移仍待实施。
+阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 4 / workbench 2 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
 
-## 下一步
+最终 Node 24 空目录安装、headless 依赖隔离、公开 SDK 消费、默认登录/输入、390px、TLS 代理、原 Session 跨兼容前端 A → B → A、Files 插件及退出清理已核对。[阶段 5](verification/PHASE-5.md)记录固定候选与完整结果，[覆盖接续](https://github.com/mapleluvr/pakka/blob/pakka/independent-webui-seams/docs/verification/WEBUI-COVERAGE-TRANSITION.md)说明旧检查的逐项处理。前端应用和 SDK 由本仓维护，Node 装配与服务仍由 Pakka 维护。
 
-按[阶段任务](https://github.com/mapleluvr/pakka/blob/29cb207ec7b305e2e0a559f3de30a7a21b490228/openspec/changes/plan-independent-webui/tasks.md)接续阶段 1 的公开消费接缝：明确协议/client/UI SDK/Backend 出口与固定制品，验证仓库外安装，并处理资源身份/原历史读取、模型配置与资产装配。
+交付使用两仓现有工作分支和 PR；分支集成、公共 registry 发布与 OpenSpec 归档分别处理。构建/替换方法见[应用交付](development/DELIVERY.md)，形成过程见[固定交付](changes/fixed-delivery.md)与[工作台界面](changes/conversation-workbench.md)。原阶段 4 失败仍保留在[原候选记录](verification/PHASE-4.md)，当前结果不倒写历史。
 
-随后才验证真实宿主、纯 UI 插件、RSI 读取/编辑、模型/Thinking 双入口与两个 Session 的原历史浏览。仓库创建本身不替代这些退出条件。
+## 保留范围与后续
+
+- Provider `/login` 与新的 API key/OAuth 交互继续延期，已有服务凭据的安全和恢复检查保留。
+- 语音草稿的预览、插入与生命周期已验证；本机无录音设备，用户授权跳过真实录音，原生识别质量仍未验证。
+- 原生推送、Windows 显示/点击与撤权清理已实测。worker 字节更新/回退覆盖旧读取取消；换版后正文仍送达旧实例的分支未覆盖。
+- Windows 深目录的私密 ACL 校验限制仍存在；维护恢复在短隔离目录通过，完整 release 的平台跳过与分轮结果明确保留。
+
+本机执行与交付记录在 `docs/.temp/phase-5/active-plan.md`；后端阶段由 [plan-independent-webui](https://github.com/mapleluvr/pakka/tree/pakka/independent-webui-seams/openspec/changes/plan-independent-webui)管理。

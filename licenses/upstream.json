@@ -1,0 +1,16 @@
+[
+  {
+    "package": "@astryxdesign/core",
+    "version": "0.7.15",
+    "path": "astryx-0.7.15.txt",
+    "sha256": "a6855be541fc8f446acd1bc4f2f8efce1ace6dce71dba32fcd8da553ee54b473",
+    "source": "https://github.com/meta/astryx/blob/af3abc36f8e66605e769256b08027683c9eef67a/LICENSE"
+  },
+  {
+    "package": "@stylexjs/stylex",
+    "version": "0.19.2",
+    "path": "stylex-0.19.2.txt",
+    "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "source": "https://github.com/facebook/stylex/blob/d7e6174c5384c64b87bc5fde1f57eedd7c11c5aa/LICENSE"
+  }
+]

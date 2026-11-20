@@ -1,0 +1,375 @@
+.page:has(.conversation-view) {
+  height: calc(100dvh - var(--workspace-header-height, 60px));
+  max-width: none;
+  padding: 0;
+}
+.conversation-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.conversation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid var(--app-line);
+  background: var(--app-surface);
+}
+.conversation-title {
+  min-width: 0;
+}
+.conversation-title h1 {
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+.conversation-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 6px;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+}
+.conversation-state [data-observation="live"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 7px;
+  border-radius: 50%;
+  background: var(--color-text-success);
+}
+.conversation-reference {
+  position: relative;
+  font-size: 0.8rem;
+}
+.conversation-reference summary {
+  white-space: nowrap;
+}
+.reference-content {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  background: var(--app-surface);
+  box-shadow: 0 8px 28px #192f4f18;
+}
+.conversation-reading {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px clamp(16px, 3vw, 40px) 24px;
+}
+.conversation-tools {
+  margin-bottom: 12px;
+}
+.conversation-tools:has(.collaboration-panel) {
+  margin-bottom: 24px;
+}
+.conversation-compose {
+  min-width: 0;
+  min-height: 0;
+  max-height: 60dvh;
+  overflow: auto;
+  padding: 8px clamp(16px, 3vw, 40px) max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--app-line);
+  background: var(--app-surface);
+}
+.conversation-compose .composer {
+  padding: 12px;
+  gap: 10px;
+  box-shadow: none;
+}
+.conversation-compose .composer-input {
+  min-height: 84px;
+}
+.conversation-compose .model-controls {
+  align-items: center;
+  gap: 4px;
+}
+.model-controls button {
+  min-width: 44px;
+  font-size: 0.85rem;
+  padding-inline: 10px;
+}
+.composer-model-control {
+  flex: 1 1 0;
+  max-width: min(42vw, 240px);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.composer-model-control > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-reading-controls:has(> .conversation-follow-controls:empty):not(
+    :has(.input-activity)
+  ) {
+  display: none;
+}
+.conversation-reading-controls {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--app-line);
+  padding-inline: clamp(12px, 3vw, 40px);
+  background: var(--app-surface);
+}
+.conversation-reading-controls .input-activity {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 0;
+}
+.conversation-reading-controls
+  .input-activity:has(.input-activity-body:not([hidden])) {
+  flex-basis: 100%;
+  order: 2;
+}
+.conversation-reading-controls .input-activity-bar {
+  flex-wrap: wrap;
+}
+.conversation-follow-controls {
+  flex-shrink: 0;
+}
+.conversation-follow-controls:has(.original-back-control)
+  .transcript-tail-controls {
+  display: none;
+}
+.conversation-reading-controls .transcript-tail-controls {
+  position: static;
+  height: 44px;
+  align-items: center;
+}
+.conversation-reading-controls .transcript-tail-controls > button {
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.conversation-compose .dictation {
+  font-size: 0.8rem;
+}
+.model-controls .dictation:not([data-phase="idle"]),
+.model-controls .dictation:has(.surface),
+.model-controls .dictation:has([role="alert"]) {
+  flex-basis: 100%;
+}
+.dictation > .surface {
+  max-height: min(240px, 30dvh);
+  overflow: auto;
+}
+.dictation[data-phase="idle"][data-available="true"] .dictation-help {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.input-pending {
+  border-top: 1px solid var(--app-line);
+  padding-top: 12px;
+}
+.pending-input-original pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.input-activity {
+  padding-bottom: 8px;
+}
+.input-activity-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.input-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--app-text);
+  background: transparent;
+  font-size: 0.8rem;
+  text-align: left;
+}
+.input-summary-status {
+  color: var(--app-muted);
+}
+.input-activity-body {
+  padding: 16px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  max-height: 40dvh;
+  overflow: auto;
+}
+.history-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.history-search > :first-child {
+  flex: 1;
+  min-width: min(100%, 160px);
+}
+.history-search-scope {
+  font-size: 0.8rem;
+}
+.history-search-scope p {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  width: min(360px, 100%);
+  padding: 16px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+.transcript-tail-controls {
+  position: sticky;
+  bottom: 8px;
+  z-index: 8;
+  height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.transcript-tail-controls > button {
+  pointer-events: auto;
+  border: 1px solid var(--app-line);
+  border-radius: 24px;
+  background: var(--app-surface);
+  box-shadow: 0 3px 12px #192f4f18;
+  font-size: 0.8rem;
+}
+.conversation-reading .message,
+.conversation-reading .message-text,
+.conversation-reading .markdown-body p {
+  font-size: 1rem;
+}
+.conversation-reading .message {
+  padding: 16px 20px;
+  border-radius: 14px;
+}
+.conversation-reading .content-body:has(> .message-heading) {
+  gap: 8px;
+}
+.conversation-reading .markdown-body > :first-child {
+  margin-top: 0;
+}
+.message-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.original-view {
+  scroll-margin-block-start: 56px;
+}
+.original-view:focus {
+  outline: none;
+}
+.original-content input {
+  scroll-margin-block: 12px;
+}
+.original-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.original-search-controls > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.message-actions,
+.entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.message-actions .copy-action {
+  position: relative;
+}
+.message-actions .copy-action > [role="status"] {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  background: var(--app-surface);
+}
+.conversation-reading .message-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.conversation-reading .message-label::before {
+  content: "";
+  width: 3px;
+  height: 24px;
+  flex-shrink: 0;
+  background: #3478f6;
+  border-radius: 2px;
+}
+.conversation-reading .message-assistant .message-label::before {
+  background: #9561e9;
+}
+@media (max-width: 760px) {
+  .conversation-heading {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .conversation-heading > .actions {
+    margin-left: auto;
+    gap: 4px;
+  }
+  .conversation-title h1 {
+    font-size: 1.15rem;
+  }
+  .conversation-state {
+    font-size: 0.75rem;
+  }
+  .conversation-reading {
+    padding: 12px 12px 20px;
+  }
+  .conversation-reading .message {
+    padding: 12px;
+  }
+  .conversation-compose {
+    padding-inline: 8px;
+    max-height: 65dvh;
+  }
+  .conversation-compose .composer {
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .composer-actions > .muted {
+    display: none;
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker", "WebWorker.Iterable"]
+  },
+  "include": ["src/integrations/pakka/notification-worker.ts"],
+  "exclude": []
+}

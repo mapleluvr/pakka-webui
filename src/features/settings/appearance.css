@@ -1,0 +1,30 @@
+:root[data-reading-size="18"] {
+  font-size: 18px;
+}
+:root[data-reading-size="20"] {
+  font-size: 20px;
+}
+:root[data-reading-size="22"] {
+  font-size: 22px;
+}
+:root[data-reading-size="24"] {
+  font-size: 24px;
+}
+:root[data-reading-font="system"] {
+  --reading-font:
+    system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+:root[data-reading-font="serif"] {
+  --reading-font: ui-serif, "Noto Serif CJK SC", "Songti SC", SimSun, serif;
+}
+:root[data-reading-font="mono"] {
+  --reading-font: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+:root[data-reading-font][data-astryx-theme],
+:root[data-reading-font] [data-astryx-theme] {
+  --font-family-body: var(--reading-font);
+}
+.appearance-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

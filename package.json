@@ -1,0 +1,54 @@
+{
+  "name": "@pakka/webui-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-only UI plugin contracts and shared React context for Pakka WebUI",
+  "exports": {
+    ".": {
+      "types": "./dist/sdk/index.d.ts",
+      "import": "./dist/sdk/index.js"
+    },
+    "./react": {
+      "types": "./dist/sdk/react.d.ts",
+      "import": "./dist/sdk/react.js"
+    }
+  },
+  "files": [
+    "dist/sdk",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "check": "npm run build:sdk && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "build:sdk": "tsc -p tsconfig.sdk.json",
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "build:app": "node scripts/build-app.mjs",
+    "build": "npm run build:sdk && npm run build:runtime && npm run build:app",
+    "pack:app": "npm run build && node scripts/pack-app.mjs",
+    "dev": "npm run build && node scripts/dev.mjs",
+    "format:check": "prettier --check src scripts docs README.md AGENTS.md *.json"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0 <20.0.0"
+  },
+  "devDependencies": {
+    "@astryxdesign/core": "0.7.15",
+    "@astryxdesign/theme-neutral": "0.7.15",
+    "@pakka/client": "file:vendor/pakka-client-73510b9c9689d6ae.tgz",
+    "@pakka/protocol": "file:vendor/pakka-protocol-d17f5af6cd81e18d.tgz",
+    "@stylexjs/stylex": "0.19.2",
+    "@tanstack/react-virtual": "3.13.12",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "prettier": "3.6.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "typescript": "7.0.2"
+  }
+}
