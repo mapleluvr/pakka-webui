@@ -148,7 +148,7 @@ export function Application({
                 <p className="muted">
                   {identity.connection
                     ? "选择一个 Conversation，继续工作或浏览原历史。"
-                    : "连接 Pakka 后进入 Conversations 和设置。组件实验室可独立使用。"}
+                    : "连接 Pakka 后进入 Conversations 和设置。"}
                 </p>
               )}
               <div className="actions">
@@ -164,13 +164,6 @@ export function Application({
                     浏览 Conversations
                   </a>
                 )}
-                <a
-                  className="text-link"
-                  href={viewHref({ plugin: "playground", view: "home" })}
-                  onClick={linkClick}
-                >
-                  进入组件实验室
-                </a>
               </div>
             </section>
           )}

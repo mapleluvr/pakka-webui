@@ -12,7 +12,6 @@ import {
   type ViewTarget,
 } from "@pakka/webui-sdk";
 import { createUiRegistry, type UiRegistry } from "../host/registry.js";
-import { playground } from "../plugins/playground.js";
 import {
   modelSettings,
   sessionSettings,
@@ -168,11 +167,6 @@ function Root() {
     });
     host.publish({
       plugin: appearanceSettings,
-      generation: "bundled-0.1.0",
-      bindings: undefined,
-    });
-    host.publish({
-      plugin: playground,
       generation: "bundled-0.1.0",
       bindings: undefined,
     });

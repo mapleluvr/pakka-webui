@@ -13,7 +13,7 @@ npm run dev
 npm run dev -- --host 127.0.0.1 --port 5173 --backend http://127.0.0.1:5180
 ```
 
-参数只接受回环地址与本地 HTTP 后端。首条命令无需后端，可使用纯 UI 示例的独立计数和 Dialog。第二条连接已经启动的 Pakka；该后端的 `publicOrigin` 须设为 `http://127.0.0.1:5173`，与浏览器地址精确对应。浏览器始终请求前端 origin 下的 `/pakka-webui/*`，开发服务器保留 Host/Origin、Cookie 和 CSRF 约束，转发有限服务路由与流式响应。不要把后端地址直接配成浏览器客户端的跨源 endpoint。
+参数只接受回环地址与本地 HTTP 后端。首条命令无需后端，可查看欢迎页、登录入口与外观设置。第二条连接已经启动的 Pakka；该后端的 `publicOrigin` 须设为 `http://127.0.0.1:5173`，与浏览器地址精确对应。浏览器始终请求前端 origin 下的 `/pakka-webui/*`，开发服务器保留 Host/Origin、Cookie 和 CSRF 约束，转发有限服务路由与流式响应。不要把后端地址直接配成浏览器客户端的跨源 endpoint。
 
 默认监视 `src`，重建成功后提示手动刷新浏览器；`--no-watch` 关闭监视。修改构建脚本或锁文件后重新启动开发命令。当前 JSX emission 和共享 React 都使用 production 模式，未启用 HMR。整页刷新会释放 UI 实例；待核对请求保留在当前标签页的 sessionStorage 中。
 
@@ -27,7 +27,6 @@ Pakka 人类凭据在登录弹窗交换为同源会话。凭据不要写入源�
 | `src/host/registry.ts`、`InstanceView.tsx`          | 通用贡献、实例、命令、资源视图、错误和清理              |
 | `src/host/links.ts`、`src/app/useViewNavigation.ts` | 稳定 hash 引用与浏览器前进/返回                         |
 | `src/integrations/pakka/`                           | 公开客户端、身份、资源解析、插件资产与 Backend bindings |
-| `src/plugins/playground.tsx`                        | 不需要服务或 Session 的纯 UI 插件                       |
 | `src/features/conversations/`                       | 授权资源列表、原历史/原文、当前模型/Thinking 与输入     |
 | `src/features/settings/`                            | 模型、预算、人员、facet 与通知设置及原请求核对          |
 
@@ -37,7 +36,7 @@ Conversation 可按完整 Session/Conversation 引用打开；未加载来源标
 
 实例连接参数按原生 `models.json` 的字段修改，保存前校验；受保护值和未编辑字段由服务保全。个人默认独立保存，只参与此 Person 后续缺省 Conversation 的创建。结果未知时按原请求查询，不重复提交。多个设置实例共享同一作用域的待核对保护：发送前同步保留身份，只有对应 requestId 的结果能清除记录。
 
-普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。恢复经 services 5 的 `input.lookup` 核对完整原 target/text/mode/requestId，空值或 unknown 保持待核对。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。重新装载时，输入框和 mode 从这份原记录初始化；详情显示冻结的原消息与请求号。确认旧请求时只清除对应记录，后来另写的草稿保持原样。
+普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。恢复经 services 6 的 `input.lookup` 核对完整原 target/text/mode/requestId，空值或 unknown 保持待核对。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。重新装载时，输入框和 mode 从这份原记录初始化；详情显示冻结的原消息与请求号。确认旧请求时只清除对应记录，后来另写的草稿保持原样。
 
 工作台在 PC 使用侧栏，窄屏使用导航抽屉；Conversation 历史独立滚动，下部输入始终可达。消息 header 提供复制、原文与原 Entry 分叉。固定阅读导航承载原文返回和最新消息入口，控制位置按内容身份保存。明确发送接续新回复，手动阅读暂停跟随；同一范围的历史刷新和配置不会重新触发此前发送的跟随意图。实际结果与未覆盖条件见[工作台界面](../verification/WORKBENCH-INTERFACE.md)。
 
@@ -61,4 +60,4 @@ RSI 工单组件、草稿和领域 decoder 位于 Pakka 的 `@pakka/rsi` 包。�
 
 使用 `npm run pack:app -- <新目录>` 交付完整应用的固定静态 tgz；归档组成、摘要来源及更新流程见[应用交付](DELIVERY.md)。发布候选使用解包后的完整应用目录和其 manifest 的 SHA-256，由 Pakka 公开 Node 装配参数 `frontend: { directory, manifestSha256 }` 指定。Node 启动前校验 schema、服务兼容和每个文件的 hash。默认 Pakka 包在构建时已选定并装入固定前端；这个参数用于可信宿主显式选择另一个兼容制品。部署与 registry 发布按各自交付流程处理。
 
-当前支持组合为资产 schema 2、services 5、extensions 3、workbench 3，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
+当前支持组合为资产 schema 2、services 6、extensions 3、workbench 3，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
