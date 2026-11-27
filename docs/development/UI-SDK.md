@@ -64,6 +64,8 @@ export const plugin = defineUiPlugin({
 
 `UiContext` 提供 `notice`、`open`、`navigate`、`dispatch`、`close` 和 `onDispose`。资源解析结果区分 ready、unloaded、unavailable、forbidden、identity-mismatch、unsupported；宿主不从 opaque id 猜测数据库路径或 Pakka URL。Pakka 接入层将自己的 typed Session/Conversation 引用交给公开服务，再适配到 UI 来源。
 
+`ui.notice({ tone, message, key? })` 用于一次用户动作的简短反馈，不替代持久回执、查询或系统推送。不要在提示中包含凭据、消息正文或技术请求号。原 API 1 调用仍可只传 `tone` 和 `message`；同一实例内相同语气和文案会折叠。如果文案相同但动作或目标不同，用不渲染的 `key` 区分。不要在渲染、订阅快照或回执历史读取时重发提示。
+
 应用 registry 实现命名空间命令；Conversation 输入的模型/Thinking 与 extension slash 解析属于各功能及 Pakka 接入层。界面命令通过 registry 打开所属实例；Backend action 按公开 schema 校验 JSON 参数，使用其 generation、effect 与 App/Conversation 作用域。普通路径及未注册 slash 文本按原消息发送，发现失败保留疑似命令参数，未启用或歧义的已声明命令明确拒绝。
 
 write/model 命令发送前保存完整原请求，App 待核对记录在同一来源/Person 的标签页内共享，Conversation 记录按原 Session/Conversation 隔离。丢响应只查询原 operation；unknown 保持待核对，新写草稿保留。effect read 不产生持久 operation，读取失败可由用户重新读取。命令返回值与后续业务工作状态分别呈现。
@@ -102,7 +104,7 @@ Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；B
 
 共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。当前两份 manifest 的 `workers` 均为空。
 
-当前开发制品要求的服务组合为 workbench 2、extensions 3、services 3；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
+当前开发制品要求的服务组合为 workbench 3、extensions 3、services 5；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
 
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 

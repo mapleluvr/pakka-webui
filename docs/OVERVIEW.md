@@ -4,7 +4,13 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的产品与架构见 [W
 
 ## 当前交付
 
-阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 4 / workbench 2 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
+阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 5 / workbench 3 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
+
+[Session 预算](changes/session-budget.md)按项以 0 表示不限制，显示宿主的实际配置和用量。本轮交互与预算组合的候选身份、验证范围和本地证据包见[交付核对](verification/INTERFACE-REFINEMENT.md)。
+
+[紧凑对话阅读与输入](changes/compact-conversation.md)按正文之间的活动段收起工具与 Thinking，桌面阅读与输入边界可调。工作台与插件共用[应用内操作反馈](changes/transient-notices.md)：短提示说明刚发生的变化，个人组织与消息投递的待确认状态仍在所属页面查询。本仓实现与默认产品的固定归档分别交付。
+
+[提供商与模型编辑器](changes/model-connections-editor.md)分别处理新端点、目录模型覆盖和模型定义，提供协议选择、兼容项、Thinking 映射与分级采样表单。
 
 最终 Node 24 空目录安装、headless 依赖隔离、公开 SDK 消费、默认登录/输入、390px、TLS 代理、原 Session 跨兼容前端 A → B → A、Files 插件及退出清理已核对。[阶段 5](verification/PHASE-5.md)记录固定候选与完整结果，[覆盖接续](https://github.com/mapleluvr/pakka/blob/pakka/independent-webui-seams/docs/verification/WEBUI-COVERAGE-TRANSITION.md)说明旧检查的逐项处理。前端应用和 SDK 由本仓维护，Node 装配与服务仍由 Pakka 维护。
 

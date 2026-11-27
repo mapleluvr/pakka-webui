@@ -1,12 +1,12 @@
 # 固定的公开浏览器依赖
 
-当前应用消费 Pakka `pakka/independent-webui-seams` 的阶段 4 公开协议与客户端归档。组合为 services 4 / workbench 2 / extensions 3，资产 schema 2；固定安装与来源随阶段候选记录核对。这些是完整公开包，前端通过包出口消费。
+本应用消费 Pakka `pakka/session-budget-unlimited` 工作树（基线 `7a329040efc3fc49bb11ad6e7280e28338765924` 与该分支的 Session 预算协议更改）构建后的 `npm pack --ignore-scripts` 公开包。services 5 / workbench 3 / extensions 3；资产 schema 2。旧的正数 decoder 不可读取 0 额度，新旧前后端不能混配。
 
 | 归档                                  | 版本  | SHA-256                                                            |
 | ------------------------------------- | ----- | ------------------------------------------------------------------ |
-| `pakka-client-73510b9c9689d6ae.tgz`   | 0.1.0 | `73510b9c9689d6ae4e2d2496e2c0c0e777f820d8f8459d9ca5d1f7795bef86dd` |
-| `pakka-protocol-d17f5af6cd81e18d.tgz` | 0.1.0 | `d17f5af6cd81e18d4bc80c92c2850e0ba0cbf2c26d1fba93cc913e3fd059ead3` |
+| `pakka-protocol-af43f2e9e3cde3df.tgz` | 0.1.0 | `af43f2e9e3cde3dfb6a0ee3550c353d8c21e7c26f6eb1a29eede9b222a04aeba` |
+| `pakka-client-63d811926effaaea.tgz`   | 0.1.0 | `63d811926effaaea6403ff660c974b7ab4bd8e3b8f68c6347bfd01c27f11a08d` |
 
-归档以内容身份命名，`package-lock.json` 同时锁定完整 integrity。纯 UI SDK 独立于这些应用开发依赖；包版本相同仍须核对精确候选字节。
+归档以内容身份命名，`package-lock.json` 锁定完整 integrity。UI SDK 不依赖这两份应用开发依赖。原归档仍在基线 Git 历史中。
 
-阶段 3 的两份旧归档已没有当前消费者，从当前树退出；其原始字节仍由 [Git 历史](https://github.com/mapleluvr/pakka-webui/tree/639397d7a7dd42875dd928d09d259d299b817e6f/vendor)保全，对应[阶段 2 公开包记录](../docs/verification/PHASE-2.md)及[阶段 3 应用记录](../docs/verification/PHASE-3.md)。当前安装只引用表中的两份归档，中间与旧候选另在仓库外保留。
+两包构建来源（`packages/{protocol,client}` 各自的 `src/**`、`package.json`、`tsconfig.json`）：按相对 Pakka 根的 POSIX 路径升序，逐文件以 UTF-8 拼接 `sha256(原始字节)␠␠路径\n` 并取 SHA-256：`cbcfb2821cd8b61237060ee307c4f015b3f3b74ab1c84e409dcd47a54cfb58c3`。两仓均未从这个工作树生成新的提交号。

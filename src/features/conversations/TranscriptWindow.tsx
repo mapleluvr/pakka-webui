@@ -8,7 +8,7 @@ import {
 } from "react";
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import type { TranscriptRow } from "./transcript.js";
-import { Button } from "@astryxdesign/core/Button";
+import { ReadingIcon } from "./ReadingIcons.js";
 import { createPortal } from "react-dom";
 
 type Anchor = { key: string; offset: number };
@@ -182,11 +182,14 @@ export function TranscriptWindow({
   const navigation =
     rows.length > 0 ? (
       <div className="transcript-tail-controls">
-        <Button
-          label={following ? "暂停跟随" : "到本页最新消息"}
-          variant="ghost"
+        <button
+          className="reader-action"
+          type="button"
           onClick={() => setFollowing((value) => !value)}
-        />
+        >
+          <ReadingIcon name={following ? "pause" : "latest"} />
+          {following ? "暂停跟随" : "到本页最新消息"}
+        </button>
       </div>
     ) : null;
   return (

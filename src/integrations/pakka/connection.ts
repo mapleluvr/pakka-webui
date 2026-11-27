@@ -1,3 +1,4 @@
+import { POCKET_VERSION } from "@pakka/protocol/pocket";
 import {
   createPocketClient,
   PocketRemoteError,
@@ -61,7 +62,7 @@ export async function connectPakka(
     { signal },
   );
   if (
-    capabilities.capabilities.workbench !== 2 ||
+    capabilities.capabilities.workbench !== POCKET_VERSION ||
     capabilities.capabilities.extensions !== 3
   )
     throw new Error("前端与 Pakka 服务版本不兼容，请使用配对的版本。");
@@ -165,7 +166,8 @@ export function describeFailure(error: unknown): string {
       CAPACITY: "服务正忙，请稍后读取状态。",
       UNSUPPORTED: "当前服务不支持此能力。",
       INVALID_REQUEST: "请求未通过校验，请检查输入。",
-      UNKNOWN: "结果尚未确认；请核对原请求，勿重复提交。",
+      UNKNOWN:
+        "暂时无法确认服务状态。请检查连接；如果刚刚提交了更改，请勿重复提交。",
     };
     return messages[error.code] ?? "操作未能完成。";
   }

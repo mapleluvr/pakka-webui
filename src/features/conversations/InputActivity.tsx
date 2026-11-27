@@ -40,6 +40,7 @@ function decodeControl(value: unknown): Control {
     throw new Error("原回执不可读。");
   return value as Control;
 }
+import { ReadingIcon } from "./ReadingIcons.js";
 import { inputModeLabel, inputStatus } from "./input-labels.js";
 
 /** Server-owned receipts; a lost mutation response only leads to observation. */
@@ -49,6 +50,8 @@ export function InputActivity({
   target,
   running,
   revision,
+  page,
+  setPage,
   disabled,
 }: {
   ui: UiContext;
@@ -56,6 +59,8 @@ export function InputActivity({
   target: AgentRef;
   running: boolean;
   revision: number;
+  page: ConversationInputHistory | null;
+  setPage(page: ConversationInputHistory | null): void;
   disabled: boolean;
 }) {
   const key = JSON.stringify([
@@ -68,7 +73,6 @@ export function InputActivity({
   const [pending, setPending] = useState<Control | "unreadable" | null>(() =>
     readPending(key, decodeControl),
   );
-  const [page, setPage] = useState<ConversationInputHistory | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +131,17 @@ export function InputActivity({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [ui, connection, target, running, revision, refresh, cursor, disabled]);
+  }, [
+    ui,
+    connection,
+    target,
+    running,
+    revision,
+    refresh,
+    cursor,
+    disabled,
+    setPage,
+  ]);
   async function control(op: Control["op"], id?: string) {
     if (admission.current || !alive() || disabled) return;
     const original: Control = {
@@ -275,12 +289,15 @@ export function InputActivity({
           </span>
         </button>
         <div className="actions">
-          <Button
-            label={reading ? "正在读取…" : "刷新回执"}
-            variant="ghost"
-            isDisabled={reading || disabled}
+          <button
+            className="reader-action"
+            type="button"
+            disabled={reading || disabled}
             onClick={() => setRefresh((value) => value + 1)}
-          />
+          >
+            <ReadingIcon name="refresh" />
+            刷新输入状态
+          </button>
           {running && connection.person.role === "admin" && (
             <Button
               label="停止当前工作"

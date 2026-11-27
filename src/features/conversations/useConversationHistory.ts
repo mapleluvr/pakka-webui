@@ -110,7 +110,7 @@ export function useConversationHistory(
         setObservation("recovering");
         if (++attempts > 3) {
           failed(
-            new Error("实时观察未恢复，请刷新原历史。尚未确认的输入仍需核对。"),
+            new Error("实时更新已断开。请点击“刷新对话记录”重新连接；发送状态待确认的消息可在发送区查询。"),
           );
           return;
         }

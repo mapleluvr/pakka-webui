@@ -37,7 +37,12 @@ export function useModelConnections(
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [epoch, setEpoch] = useState(0);
   const admission = useRef(false);
+  function clearFeedback() {
+    setMessage(null);
+    setError(null);
+  }
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
   const signal = () => requestSignal(ui.signal, connection);
   async function read(readSignal = signal()) {
@@ -45,7 +50,10 @@ export function useModelConnections(
       { op: "model-connections.read" },
       { signal: readSignal },
     );
-    if (!readSignal.aborted) setView(result.configuration);
+    if (!readSignal.aborted) {
+      setView(result.configuration);
+      setEpoch((n) => n + 1);
+    }
   }
   useEffect(() => {
     const controller = new AbortController();
@@ -77,11 +85,12 @@ export function useModelConnections(
     if (alive()) setReceipt(result);
     if (result.state === "saved") {
       release(original.requestId);
+      const target = original.edits[0]?.path[1] ?? "配置";
       if (alive())
         setMessage(
           result.reload === "ready"
-            ? "配置已保存并重新加载。端点能力需通过实际请求确认。"
-            : "配置已保存，重新加载尚未完成；可以单独重载。",
+            ? `已保存 ${target} 并重载。`
+            : `已保存 ${target}，尚未重载。可单独重载已保存配置。`,
         );
       try {
         await read();
@@ -92,8 +101,10 @@ export function useModelConnections(
     }
   }
   async function save(
+    expectedVersion: string,
     edits: readonly ModelConfigurationEdit[],
     validateOnly = false,
+    onReserved?: (id: string) => void,
   ) {
     if (admission.current || !view || !alive()) return;
     const existing = restore();
@@ -111,7 +122,7 @@ export function useModelConnections(
     try {
       const change = decodeModelConfigurationChange({
         requestId: crypto.randomUUID(),
-        expectedVersion: view.version,
+        expectedVersion,
         edits,
       });
       const validation = await connection.services.request(
@@ -121,10 +132,7 @@ export function useModelConnections(
       if (!validation.valid)
         throw new Error("原生配置校验未通过，请检查端点、协议与模型参数。");
       if (validateOnly) {
-        if (alive())
-          setMessage(
-            "原生配置校验通过，尚未保存；这不证明端点或模型能力可用。",
-          );
+        if (alive()) setMessage("原生配置校验通过，尚未保存。");
         return;
       }
       const reserved = claimPending(
@@ -141,6 +149,7 @@ export function useModelConnections(
           setError("另一个界面有原请求尚未确认，请先核对；本次修改未提交。");
         return;
       }
+      onReserved?.(change.requestId);
       sent = change;
       const result = await connection.services.request(
         { op: "model-connections.write", change },
@@ -215,6 +224,8 @@ export function useModelConnections(
     }
   }
   return {
+    clearFeedback,
+    epoch,
     view,
     pending,
     receipt,

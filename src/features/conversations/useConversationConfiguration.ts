@@ -22,7 +22,7 @@ import {
   requestSignal,
   type PakkaConnection,
 } from "../../integrations/pakka/connection.js";
-import { exactModel } from "./ModelPicker.js";
+import { exactModel } from "./modelCatalog.js";
 
 /** The original receipt proves the change; current configuration is read separately. */
 export function useConversationConfiguration(

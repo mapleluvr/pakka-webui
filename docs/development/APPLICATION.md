@@ -37,7 +37,7 @@ Conversation 可按完整 Session/Conversation 引用打开；未加载来源标
 
 实例连接参数按原生 `models.json` 的字段修改，保存前校验；受保护值和未编辑字段由服务保全。个人默认独立保存，只参与此 Person 后续缺省 Conversation 的创建。结果未知时按原请求查询，不重复提交。多个设置实例共享同一作用域的待核对保护：发送前同步保留身份，只有对应 requestId 的结果能清除记录。
 
-普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。恢复经 services 4 的 `input.lookup` 核对完整原 target/text/mode/requestId，空值或 unknown 保持待核对。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。重新装载时，输入框和 mode 从这份原记录初始化；详情显示冻结的原消息与请求号。确认旧请求时只清除对应记录，后来另写的草稿保持原样。
+普通 Conversation 输入的未知结果会保留稳定来源、Person、Conversation 和 requestId，并阻止再次发送；后端重开不丢失这项保护。恢复经 services 5 的 `input.lookup` 核对完整原 target/text/mode/requestId，空值或 unknown 保持待核对。sessionStorage 限于当前标签页生命周期，不是跨设备恢复账本。重新装载时，输入框和 mode 从这份原记录初始化；详情显示冻结的原消息与请求号。确认旧请求时只清除对应记录，后来另写的草稿保持原样。
 
 工作台在 PC 使用侧栏，窄屏使用导航抽屉；Conversation 历史独立滚动，下部输入始终可达。消息 header 提供复制、原文与原 Entry 分叉。固定阅读导航承载原文返回和最新消息入口，控制位置按内容身份保存。明确发送接续新回复，手动阅读暂停跟随；同一范围的历史刷新和配置不会重新触发此前发送的跟随意图。实际结果与未覆盖条件见[工作台界面](../verification/WORKBENCH-INTERFACE.md)。
 
@@ -61,4 +61,4 @@ RSI 工单组件、草稿和领域 decoder 位于 Pakka 的 `@pakka/rsi` 包。�
 
 使用 `npm run pack:app -- <新目录>` 交付完整应用的固定静态 tgz；归档组成、摘要来源及更新流程见[应用交付](DELIVERY.md)。发布候选使用解包后的完整应用目录和其 manifest 的 SHA-256，由 Pakka 公开 Node 装配参数 `frontend: { directory, manifestSha256 }` 指定。Node 启动前校验 schema、服务兼容和每个文件的 hash。默认 Pakka 包在构建时已选定并装入固定前端；这个参数用于可信宿主显式选择另一个兼容制品。部署与 registry 发布按各自交付流程处理。
 
-当前支持组合为资产 schema 2、services 4、extensions 3、workbench 2，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。
+当前支持组合为资产 schema 2、services 5、extensions 3、workbench 3，UI SDK api 1 / `react19-astryx0.7.15`；阶段 2/3 已验收的固定应用仍声明 services 3。`scripts/runtime-style-hashes.json` 为固定 Astryx 版本的必要运行时样式声明精确摘要；构建将其纳入 manifest，服务按摘要生成 CSP。依赖升级时须重新核对样式字节及正反检查。预构建主题继续使用静态 CSS，未获许可的 inline style 被拒绝。

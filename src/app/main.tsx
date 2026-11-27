@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   defineUiPlugin,
@@ -172,6 +178,10 @@ function Root() {
     });
     return host;
   });
+  useLayoutEffect(
+    () => () => registry.clearNotices(),
+    [identity.connection, registry],
+  );
   useEffect(() => {
     if (!isSecureContext || !("serviceWorker" in navigator)) return;
     let active = true;
@@ -296,9 +306,16 @@ function Root() {
       identity={identity}
       initialCredential={initialCredential}
       refreshExtensions={async () => {
+        const attached = extensions.current;
         try {
-          await extensions.current?.refresh();
+          await attached?.refresh();
         } catch {
+          if (
+            !attached ||
+            extensions.current !== attached ||
+            identity.connection?.signal.aborted
+          )
+            return;
           registry.notice({
             tone: "warning",
             message: "插件发现未能完成，请检查连接后重试。",

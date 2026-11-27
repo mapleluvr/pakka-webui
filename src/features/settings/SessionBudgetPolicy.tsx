@@ -38,6 +38,8 @@ const values = (limits: SessionBudgetLimits): Draft["limits"] => ({
   maxPrimaryAttempts: String(limits.maxPrimaryAttempts),
   maxAuxiliaryAttempts: String(limits.maxAuxiliaryAttempts),
 });
+const displayLimit = (limit: number) =>
+  limit === 0 ? "不限制" : String(limit);
 export function SessionBudgetPolicy({
   ui,
   connection,
@@ -138,8 +140,8 @@ export function SessionBudgetPolicy({
       const parsed = Object.fromEntries(
         fields.map(({ key }) => {
           const text = draft.limits[key].trim();
-          if (!/^[1-9][0-9]*$/.test(text))
-            throw new Error("各项上限须填写正整数。");
+          if (!/^(0|[1-9][0-9]*)$/.test(text))
+            throw new Error("各项上限须填写非负整数；0 表示不限制。");
           return [key, Number(text)];
         }),
       );
@@ -275,7 +277,8 @@ export function SessionBudgetPolicy({
             <div>
               <dt>Conversation 数量</dt>
               <dd>
-                {policy.conversationCount} / {policy.limits.maxConversations}
+                {policy.conversationCount} /{" "}
+                {displayLimit(policy.limits.maxConversations)}
               </dd>
             </div>
             <div>
@@ -283,7 +286,7 @@ export function SessionBudgetPolicy({
               <dd>
                 {policy.budget.primaryAttempts}
                 {" / "}
-                {policy.limits.maxPrimaryAttempts}
+                {displayLimit(policy.limits.maxPrimaryAttempts)}
               </dd>
             </div>
             <div>
@@ -291,7 +294,7 @@ export function SessionBudgetPolicy({
               <dd>
                 {policy.budget.auxiliaryAttempts}
                 {" / "}
-                {policy.limits.maxAuxiliaryAttempts}
+                {displayLimit(policy.limits.maxAuxiliaryAttempts)}
               </dd>
             </div>
           </dl>
@@ -308,7 +311,9 @@ export function SessionBudgetPolicy({
           <h2>调整上限</h2>
           <p className="muted">
             按版本 {draft.version}
-            {" 提交。降低上限不会取消已接纳工作，超出额度时后续接纳会被拒绝。"}
+            {
+              " 提交。0 表示不限制该项。降低正数上限不会取消已接纳工作，超出额度时后续接纳会被拒绝。"
+            }
           </p>
           {fields.map(({ key, label }) => (
             <TextInput
@@ -368,9 +373,9 @@ export function SessionBudgetPolicy({
                     {new Date(row.at).toLocaleString()} · {row.actorId}
                   </p>
                   <p>
-                    上限：{row.after.maxConversations} 个 Conversations，
-                    {row.after.maxPrimaryAttempts} 次主要推理，
-                    {row.after.maxAuxiliaryAttempts} 次辅助推理。
+                    Conversation：{displayLimit(row.after.maxConversations)}
+                    ；主要推理：{displayLimit(row.after.maxPrimaryAttempts)}
+                    ；辅助推理：{displayLimit(row.after.maxAuxiliaryAttempts)}。
                   </p>
                   <p className="muted">
                     当时已消耗：主要 {row.budget.primaryAttempts} 次，辅助{" "}

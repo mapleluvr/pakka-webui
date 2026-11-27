@@ -68,7 +68,10 @@ export function ForkConversation({
       });
     return () => controller.abort();
   }, [entryId, target, ui, connection]);
-  async function complete(result: PocketClientResult | undefined) {
+  async function complete(
+    confirmation: { result: PocketClientResult } | undefined,
+  ) {
+    const result = confirmation?.result;
     const ref =
       result?.kind === "reference"
         ? result.ref
