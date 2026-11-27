@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import type { ConversationInputHistory } from "@pakka/protocol/webui";
 import type { AgentRef } from "@pakka/protocol/pocket";
 import { Button } from "@astryxdesign/core/Button";
 import type { UiViewProps } from "@pakka/webui-sdk";
 import { conversationReference } from "../../integrations/pakka/resources.js";
 import type { PakkaConnection } from "../../integrations/pakka/connection.js";
 import { HistoryBody } from "./HistoryBody.js";
+import { ReadingIcon } from "./ReadingIcons.js";
 import { ReadingState } from "./ReadingState.js";
 import { useConversationHistory } from "./useConversationHistory.js";
 import { useConversationName } from "./useConversationName.js";
@@ -12,21 +21,22 @@ import { Composer } from "./Composer.js";
 import { InputActivity } from "./InputActivity.js";
 import { ForkConversation } from "./ForkConversation.js";
 import { Collaboration } from "./Collaboration.js";
+import { DeskDivider } from "../../ui/DeskDivider.js";
 import "./conversation.css";
 
 const resolutionLabels = {
-  loaded: "已加载",
-  unloaded: "未加载 · 保存历史",
+  loaded: "",
+  unloaded: "正在查看已保存的对话记录",
   unavailable: "原来源不可得",
   forbidden: "无权读取原资源",
   "identity-mismatch": "原 Session 身份不符",
 };
 const observationLabels = {
-  reading: "正在连接观察…",
-  live: "实时观察",
-  recovering: "正在恢复观察…",
-  stopped: "观察已暂停",
-  saved: "保存记录",
+  reading: "正在连接实时更新…",
+  live: "",
+  recovering: "正在重新连接，新的消息可能延迟显示",
+  stopped: "实时更新已暂停",
+  saved: "正在查看已保存的对话记录",
 };
 export function ConversationView({
   ui,
@@ -37,8 +47,10 @@ export function ConversationView({
   contributions?: (target: AgentRef) => ReactNode;
   onTitle?(name: string): void;
 }) {
+  const composeId = useId();
   const reference = useMemo(() => conversationReference(ui.resource), [ui]);
   const [before, setBefore] = useState<string | undefined>();
+  const [inputs, setInputs] = useState<ConversationInputHistory | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [followRevision, setFollowRevision] = useState(0);
   const [forkEntry, setForkEntry] = useState<string | null>(null);
@@ -64,43 +76,48 @@ export function ConversationView({
   }, [title, onTitle, ui.signal, bindings.signal]);
   const page = history?.status === "loaded" ? history.snapshot : history?.page;
   const running = history?.status === "loaded" && history.snapshot.live.busy;
+  const status = history?.status ?? resolution?.status;
+  const stateText = !status
+    ? "正在核对原资源…"
+    : status !== "loaded"
+      ? resolutionLabels[status]
+      : observationLabels[observation];
   return (
     <section className="conversation-view">
       <header className="conversation-heading">
         <div className="conversation-title">
           <h1>{title}</h1>
-          <div className="conversation-state">
-            <span>
-              {history
-                ? resolutionLabels[history.status]
-                : resolution
-                  ? resolutionLabels[resolution.status]
-                  : "正在核对原资源…"}
-            </span>
-            <span role="status" data-observation={observation}>
-              {observationLabels[observation]}
-              {running ? " · 正在执行" : ""}
-            </span>
-          </div>
+          {(stateText || running) && (
+            <div className="conversation-state" role="status">
+              {stateText && <span>{stateText}</span>}
+              {running && <span>Agent 正在执行</span>}
+            </div>
+          )}
         </div>
         <div className="actions">
           <details className="conversation-reference">
-            <summary>原引用</summary>
+            <summary className="reader-action">
+              <ReadingIcon name="chevron" />
+              会话标识
+            </summary>
             <div className="reference-content">
               <p className="identifier">Session {reference.sessionId}</p>
               <p className="identifier">
                 Conversation {reference.conversationId}
               </p>
               <p className="muted">
-                当前页面读取这个原对象；模型、目录和 preset 变更仍走原配置请求。
+                这些标识可用于在其他客户端找到同一段对话。
               </p>
             </div>
           </details>
-          <Button
-            label="刷新原历史"
-            variant="ghost"
+          <button
+            className="reader-action"
+            type="button"
             onClick={() => setRefresh((value) => value + 1)}
-          />
+          >
+            <ReadingIcon name="refresh" />
+            刷新对话记录
+          </button>
         </div>
       </header>
       <div
@@ -130,7 +147,7 @@ export function ConversationView({
           resolution.status !== "unloaded" && (
             <div className="surface flow">
               <h2>{resolutionLabels[resolution.status]}</h2>
-              <p>请核对原引用、来源登记与当前身份的权限，然后重新读取。</p>
+              <p>请检查会话标识，以及当前账号是否仍有权读取这段对话。</p>
             </div>
           )}
         {!error &&
@@ -169,6 +186,14 @@ export function ConversationView({
                 scroll={scroll}
                 controls={readingControls}
                 entries={page.entries}
+                inputs={resolution?.status === "loaded" ? inputs : null}
+                processingLive={
+                  !before &&
+                  observation === "live" &&
+                  !loading &&
+                  !error &&
+                  running
+                }
                 live={
                   history?.status === "loaded" && !before
                     ? history.snapshot.live
@@ -217,6 +242,8 @@ export function ConversationView({
             ui={ui}
             connection={bindings}
             target={resolution.target}
+            page={inputs}
+            setPage={setInputs}
             revision={refresh}
             running={running}
             disabled={loading || !!error}
@@ -230,19 +257,22 @@ export function ConversationView({
         />
       </div>
       {resolution?.status === "loaded" && (
-        <footer className="conversation-compose">
-          <Composer
-            ui={ui}
-            connection={bindings}
-            target={resolution.target}
-            disabled={loading || !!error}
-            running={running}
-            onSubmitted={() => setFollowRevision((value) => value + 1)}
-            changed={() => {
-              setBefore(undefined);
-              setRefresh((value) => value + 1);
-            }}
-          />
+        <footer className="compose-pane">
+          <DeskDivider kind="draft" controls={composeId} />
+          <div id={composeId} className="conversation-compose">
+            <Composer
+              ui={ui}
+              connection={bindings}
+              target={resolution.target}
+              disabled={loading || !!error}
+              running={running}
+              onSubmitted={() => setFollowRevision((value) => value + 1)}
+              changed={() => {
+                setBefore(undefined);
+                setRefresh((value) => value + 1);
+              }}
+            />
+          </div>
         </footer>
       )}
     </section>

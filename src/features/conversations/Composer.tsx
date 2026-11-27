@@ -3,7 +3,7 @@ import { Dictation } from "./Dictation.js";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { CloseIcon } from "../../host/InstanceView.js";
 import { Button } from "@astryxdesign/core/Button";
-import { Selector } from "@astryxdesign/core/Selector";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import type { UiContext } from "@pakka/webui-sdk";
@@ -14,12 +14,8 @@ import {
   requestSignal,
   type PakkaConnection,
 } from "../../integrations/pakka/connection.js";
-import {
-  ModelPicker,
-  exactModel,
-  modelKey,
-  modelSelectionProblem,
-} from "./ModelPicker.js";
+import { exactModel, modelKey, modelSelectionProblem } from "./modelCatalog.js";
+import { ConversationModelPicker } from "./ConversationModelPicker.js";
 import { dispatchExtensionCommand } from "../../integrations/pakka/extensions.js";
 import { useConversationConfiguration } from "./useConversationConfiguration.js";
 import { useExtensionCommand } from "./useExtensionCommand.js";
@@ -29,7 +25,11 @@ import {
   type InputMode,
 } from "./useConversationInput.js";
 
-import { inputModeLabel, inputStatus } from "./input-labels.js";
+import {
+  inputModeLabel,
+  inputModeDescription,
+  sendLabel,
+} from "./input-labels.js";
 
 export function Composer({
   ui,
@@ -51,13 +51,12 @@ export function Composer({
   const config = useConversationConfiguration(ui, connection, target, changed);
   const delivery = useConversationInput(ui, connection, target, changed);
   const extensionCommand = useExtensionCommand(ui, connection, target, changed);
-  const [draft, setDraft] = useState(() =>
-    delivery.pending && delivery.pending !== "unreadable"
-      ? delivery.pending.text
-      : extensionCommand.pending && extensionCommand.pending !== "unreadable"
-        ? extensionCommand.pending.text
-        : "",
-  );
+  const [draft, setDraft] = useState(() => {
+    for (const pending of [delivery.pending, extensionCommand.pending]) {
+      if (pending && pending !== "unreadable") return pending.text;
+    }
+    return "";
+  });
   const [mode, setMode] = useState<InputMode>(() =>
     delivery.pending && delivery.pending !== "unreadable"
       ? delivery.pending.mode
@@ -114,6 +113,14 @@ export function Composer({
   }
   async function submit() {
     if (
+      draft.trim() === "/model" &&
+      !delivery.pending &&
+      !extensionCommand.pending
+    ) {
+      setPicker("model");
+      return;
+    }
+    if (
       busy ||
       config.unconfirmed ||
       commandPending.current ||
@@ -124,14 +131,14 @@ export function Composer({
       return;
     const text = draft.trim();
     setError(null);
-    if (text === "/model" || text === "/thinking") {
+    if (text === "/thinking") {
       if (!configurable) {
         setError(
           "当前 Conversation 不能修改模型设置，请先读取配置并核对权限。",
         );
         return;
       }
-      setPicker(text === "/model" ? "model" : "thinking");
+      setPicker("thinking");
       return;
     }
     if (text.startsWith("/model ")) {
@@ -186,50 +193,12 @@ export function Composer({
       onSubmitted?.();
     }
   }
+  const modelLabel = config.configuration?.current?.model ?? "选择模型";
+  const levelLabel = config.model?.thinkingLevels.length
+    ? (config.configuration?.current?.thinkingLevel ?? "默认")
+    : "不支持";
   return (
     <section className="composer surface flow" aria-label="Conversation 输入">
-      <div className="actions model-controls">
-        <Button
-          label={config.configuration?.current?.model ?? "选择模型"}
-          className="composer-model-control"
-          size="sm"
-          variant="ghost"
-          isDisabled={!configurable}
-          onClick={() => setPicker("model")}
-        />
-        <Button
-          label={
-            config.model?.thinkingLevels.length
-              ? `Thinking · ${config.configuration?.current?.thinkingLevel ?? "默认"}`
-              : "Thinking · 不支持"
-          }
-          size="sm"
-          variant="ghost"
-          isDisabled={!configurable || !config.model?.thinkingLevels.length}
-          onClick={() => setPicker("thinking")}
-        />
-        <ConversationSettings
-          compact
-          ui={ui}
-          connection={connection}
-          config={config}
-          disabled={busy}
-          running={running}
-        />
-        <Dictation
-          compact
-          key={JSON.stringify(config.currentTarget())}
-          box={input}
-          signal={dictationSignal}
-          enabled={
-            !busy &&
-            !config.unconfirmed &&
-            !delivery.pending &&
-            !extensionCommand.pending
-          }
-          onText={setDraft}
-        />
-      </div>
       {config.unconfirmed && (
         <div role="status" className="flow compact">
           <p className="identifier">
@@ -250,6 +219,7 @@ export function Composer({
       <form
         className="flow compact"
         onSubmit={(event) => {
+          if (event.target !== event.currentTarget) return;
           event.preventDefault();
           void submit();
         }}
@@ -260,15 +230,20 @@ export function Composer({
           isLabelHidden
           value={draft}
           onChange={setDraft}
-          rows={3}
-          placeholder="输入消息，或使用 /model、/thinking"
+          rows={2}
+          placeholder="Where all miracles begin."
           autoComplete="off"
           controlClassName="composer-input"
           onKeyDown={(event) => {
             if (
               event.key === "Enter" &&
               !event.shiftKey &&
-              !event.nativeEvent.isComposing
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.altKey &&
+              !event.repeat &&
+              !event.nativeEvent.isComposing &&
+              event.nativeEvent.keyCode !== 229
             ) {
               event.preventDefault();
               void submit();
@@ -276,38 +251,92 @@ export function Composer({
           }}
         />
         <div className="composer-actions">
-          <Selector
-            label="输入方式"
-            isLabelHidden
-            options={[
-              { value: "prompt", label: inputModeLabel.prompt },
-              { value: "steer", label: inputModeLabel.steer },
-              { value: "followUp", label: inputModeLabel.followUp },
-            ]}
-            value={mode}
-            onChange={(value) => setMode(value as InputMode)}
-            presentation="adaptive"
-            controlClassName="touch-control"
-          />
-          <span className="muted">Enter 发送 · Shift+Enter 换行</span>
-          <Button
-            label={busy ? "正在处理…" : inputModeLabel[mode]}
-            type="submit"
-            isDisabled={
-              busy ||
-              config.unconfirmed ||
-              !draft.trim() ||
-              !!delivery.pending ||
-              !!extensionCommand.pending
-            }
-          />
+          <div className="actions model-controls">
+            <button
+              type="button"
+              className="toolbar-choice composer-model-control"
+              onClick={() => setPicker("model")}
+              aria-label={modelLabel}
+              title={modelLabel}
+            >
+              <span className="choice-wide">{modelLabel}</span>
+              <span className="choice-short">
+                {modelLabel.slice(modelLabel.indexOf("/") + 1)}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="toolbar-choice thinking-control"
+              disabled={!configurable || !config.model?.thinkingLevels.length}
+              onClick={() => setPicker("thinking")}
+              aria-label={`Thinking · ${levelLabel}`}
+              title={`Thinking · ${levelLabel}`}
+            >
+              <span className="choice-wide">Thinking · </span>
+              {levelLabel}
+            </button>
+            <ConversationSettings
+              compact
+              ui={ui}
+              connection={connection}
+              config={config}
+              disabled={busy}
+              running={running}
+            />
+            <Dictation
+              compact
+              key={JSON.stringify(config.currentTarget())}
+              box={input}
+              signal={dictationSignal}
+              enabled={
+                !busy &&
+                !config.unconfirmed &&
+                !delivery.pending &&
+                !extensionCommand.pending
+              }
+              onText={setDraft}
+            />
+          </div>
+          <div className="send-cluster">
+            <MoreMenu
+              label={`输入方式：${inputModeLabel[mode]}`}
+              alignment="end"
+              placement="above"
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <path d="m7 10 5 5 5-5" />
+                </svg>
+              }
+              items={(["prompt", "steer", "followUp"] as const).map(
+                (value) => ({
+                  label: inputModeLabel[value],
+                  description: inputModeDescription[value],
+                  onClick: () => setMode(value),
+                }),
+              )}
+            />
+            <Button
+              label={busy ? "正在处理…" : sendLabel[mode]}
+              type="submit"
+              isDisabled={
+                busy ||
+                config.unconfirmed ||
+                !draft.trim() ||
+                !!delivery.pending ||
+                !!extensionCommand.pending
+              }
+            />
+          </div>
         </div>
       </form>
-      {running && (
-        <p className="muted">
-          调整消息会在下一次可介入时送达。后续消息在本轮工作结束后执行。
-        </p>
-      )}
       {(error ?? config.error ?? delivery.error ?? extensionCommand.error) && (
         <p role="alert" className="error-text">
           {error ?? config.error ?? delivery.error ?? extensionCommand.error}
@@ -364,21 +393,21 @@ export function Composer({
           )}
         </div>
       )}
-      {delivery.receipt && (
-        <p role="status" className="muted">
-          本次提交：{inputStatus[delivery.receipt.status]}
-        </p>
-      )}
-      {delivery.pending && (
-        <div role="status" className="input-pending flow compact">
+      {delivery.pending && (!delivery.busy || delivery.checking) && (
+        <section
+          aria-label="待确认的消息"
+          className="input-pending flow compact"
+        >
           {delivery.pending === "unreadable" ? (
             <p>本地待核对记录不可读。请保留原记录，当前已阻止重复提交。</p>
           ) : (
             <>
-              <p>这条消息的结果尚未确认，已阻止重复提交。</p>
+              <p>还不能确认这条消息是否已送达。</p>
               <details className="pending-input-original">
                 <summary>
-                  原消息 · {inputModeLabel[delivery.pending.mode]}
+                  {inputModeLabel[delivery.pending.mode]} · 「
+                  {delivery.pending.text.slice(0, 32)}
+                  {delivery.pending.text.length > 32 ? "…" : ""}」
                 </summary>
                 <pre>{delivery.pending.text}</pre>
                 <p className="identifier">
@@ -387,7 +416,9 @@ export function Composer({
               </details>
               {delivery.pending.receiptId || delivery.pending.target ? (
                 <Button
-                  label="核对原请求"
+                  label={
+                    delivery.checking ? "正在查看发送状态…" : "查看发送状态"
+                  }
                   variant="ghost"
                   isDisabled={busy}
                   onClick={() => {
@@ -406,15 +437,17 @@ export function Composer({
               )}
             </>
           )}
-        </div>
+        </section>
       )}
       {picker === "model" && (
-        <ModelPicker
+        <ConversationModelPicker
+          key={JSON.stringify(target)}
+          currentModel={config.configuration?.current?.model}
           connection={connection}
           ui={ui}
           close={closePicker}
           choose={(item) => choose(item, draft.trim() === "/model")}
-          disabled={busy}
+          disabled={!configurable}
         />
       )}
       {picker === "thinking" && (

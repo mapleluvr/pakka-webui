@@ -1,0 +1,341 @@
+.model-settings {
+  overflow-wrap: anywhere;
+}
+.model-settings button:not(:where([role="tree"] button)) {
+  padding: 8px 13px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  min-width: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.model-settings button:hover:not(:disabled, :where([role="tree"] button)),
+.model-settings button[aria-pressed="true"] {
+  background: var(--color-background-muted);
+  border-color: var(--app-accent);
+}
+.model-settings button:disabled {
+  opacity: 0.55;
+}
+.model-settings button.primary-action {
+  color: var(--app-background);
+  background: var(--app-text);
+}
+.model-settings button.primary-action:hover:not(:disabled) {
+  color: var(--app-text);
+}
+.connection-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 2.5fr);
+  gap: 16px;
+  align-items: start;
+}
+.connection-nav {
+  position: sticky;
+  top: 8px;
+  padding: 16px;
+}
+.connection-list,
+.protocol-list {
+  display: grid;
+  gap: 5px;
+  grid-auto-rows: max-content;
+  max-height: 45vh;
+  overflow: auto;
+}
+.connection-list button,
+.protocol-list button,
+.protocol-field > button {
+  display: grid;
+  text-align: start;
+  gap: 3px;
+}
+.connection-nav h2,
+.connection-detail h2,
+.connection-detail h3,
+.connection-detail h4,
+.connection-detail p {
+  margin: 0;
+}
+.connection-detail,
+.model-settings .field,
+.connection-detail > * {
+  min-width: 0;
+}
+.connection-detail summary {
+  min-height: 44px;
+  cursor: pointer;
+  padding: 11px 0;
+  font-weight: 600;
+}
+.connection-detail details {
+  border-top: 1px solid var(--app-line);
+}
+.editor-fields {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+.protocol-field {
+  display: grid;
+  gap: 6px;
+}
+.protocol-options,
+.draft-guard,
+.sampling-row {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-background-muted);
+}
+.thinking-map {
+  width: 100%;
+  border-collapse: collapse;
+}
+.thinking-map th,
+.thinking-map td {
+  border-bottom: 1px solid var(--app-line);
+  padding: 6px 0;
+  text-align: start;
+  vertical-align: top;
+}
+.thinking-map th:first-child {
+  width: 5em;
+  padding-right: 10px;
+}
+.thinking-map tbody th {
+  padding-top: 18px;
+}
+.thinking-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+}
+.thinking-controls .field {
+  flex: 1 1 10em;
+}
+.thinking-disable {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.sampling-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  align-items: end;
+}
+.connection-detail .field {
+  display: grid;
+  gap: 5px;
+}
+.connection-detail .field small[role="alert"] {
+  color: var(--color-text-danger);
+}
+.connection-detail .actions {
+  align-items: end;
+}
+.back-list {
+  display: none;
+}
+@media (max-width: 700px) {
+  .connection-layout {
+    display: block;
+  }
+  .connection-layout[data-list="false"] .connection-nav,
+  .connection-layout[data-list="true"] .connection-detail {
+    display: none;
+  }
+  .connection-nav {
+    position: static;
+  }
+  .back-list {
+    display: block;
+    align-self: flex-start;
+  }
+  .model-settings .surface {
+    padding: 14px;
+  }
+}
+
+.connection-detail header .eyebrow {
+  text-transform: none;
+}
+.resume-mobile {
+  display: none;
+}
+@media (max-width: 700px) {
+  .resume-mobile {
+    display: block;
+  }
+}
+
+.native-explorer {
+  position: relative;
+  min-width: 0;
+}
+.native-toolbar,
+.native-columns-head,
+.native-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.native-explorer[open] > summary {
+  padding-inline-end: 8rem;
+  min-height: 54px;
+}
+.native-toolbar {
+  position: absolute;
+  inset: 4px 0 auto auto;
+}
+.native-toolbar button,
+.native-branch-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.native-columns {
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.native-columns.editing {
+  grid-template-columns: minmax(0, 1.5fr) minmax(235px, 1fr);
+}
+.native-tree,
+.native-inspector {
+  padding: 10px;
+  min-width: 0;
+}
+.native-columns-head {
+  padding: 4px 8px 8px;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--app-line);
+}
+.native-tree [role="treeitem"] code {
+  font-size: 0.9rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.native-tree .native-row-value {
+  display: block;
+  max-width: 10em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.85rem;
+  color: var(--app-muted);
+}
+.native-add-child {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.native-tree [aria-expanded="false"] .native-branch-actions {
+  visibility: hidden;
+}
+.native-add-child:hover {
+  background: var(--color-background-muted);
+}
+.native-tree {
+  overflow-x: auto;
+}
+.native-tree .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.native-owners summary small {
+  float: inline-end;
+  color: var(--app-muted);
+  font-weight: normal;
+}
+.native-managed-list {
+  padding: 0 1rem 8px;
+  max-height: 15rem;
+  overflow: auto;
+}
+.native-managed-list li {
+  padding-block: 3px;
+  overflow-wrap: anywhere;
+}
+.native-inspector {
+  border-inline-start: 1px solid var(--app-line);
+  align-self: start;
+}
+.native-inspector textarea,
+.native-sheet textarea {
+  width: 100%;
+  max-width: 100%;
+}
+.native-sheet {
+  position: fixed;
+  inset: auto 0 0;
+  margin: 0 auto;
+  width: min(100%, 42rem);
+  max-width: 100%;
+  max-height: 80dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: 14px 14px 0 0;
+  padding: 14px 16px max(env(safe-area-inset-bottom), 16px);
+  overflow-wrap: anywhere;
+}
+.native-sheet::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.native-tree [role="treeitem"] button[aria-labelledby] {
+  justify-content: center;
+}
+.native-inspector,
+.native-sheet > .flow {
+  gap: 8px;
+}
+.native-inspector {
+  position: sticky;
+  top: 8px;
+  max-height: calc(100dvh - 20px);
+  overflow: auto;
+}
+.native-original {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.native-original p {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+.native-original button {
+  flex-shrink: 0;
+}
+.native-path {
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+.model-settings .native-close {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}

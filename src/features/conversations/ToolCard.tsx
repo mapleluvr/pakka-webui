@@ -8,8 +8,9 @@ import type { ReactNode } from "react";
 import { ImageContent } from "./ImageContent.js";
 import { useDisclosure } from "./ReadingState.js";
 import type { ToolContent } from "./transcript.js";
+import { ToolDetails, toolSource } from "./ToolDetails.js";
 
-function Thinking({
+export function Thinking({
   part,
   identity,
   ...bindings
@@ -26,6 +27,7 @@ function Thinking({
       <summary>Thinking</summary>
       {open && (
         <TextContent
+          panel={{ title: "思考摘要" }}
           text={part.thinking}
           reference={part.contentReference}
           {...bindings}
@@ -94,19 +96,10 @@ export function MessageBody({
                   {...bindings}
                 />
               );
-            case "toolCall":
+            default:
               return null; // Rendered once by the transcript's source-aware tool index.
           }
         })
-      )}
-      {message.errorMessage && (
-        <div className="error-text">
-          <TextContent
-            text={message.errorMessage}
-            reference={message.errorReference}
-            {...bindings}
-          />
-        </div>
       )}
     </>
   );
@@ -118,24 +111,18 @@ export function ToolCard({
   ...bindings
 }: ContentBindings & { tool: ToolContent; identity: string; source: string }) {
   const [open, setOpen] = useDisclosure(identity);
-  const status = tool.result
-    ? tool.result.isError
-      ? "失败"
-      : "已结束"
-    : tool.live
-      ? { pending: "待执行", running: "执行中", done: "已结束" }[
-          tool.live.status
-        ]
-      : "调用已记录";
-  const size =
-    (tool.declaration?.contentReference?.byteLength ?? 0) +
-    (tool.result?.contentReference?.byteLength ?? 0) +
-    (Array.isArray(tool.result?.content)
-      ? tool.result.content.reduce(
-          (sum, part) => sum + (part.contentReference?.byteLength ?? 0),
-          0,
-        )
-      : 0);
+  let status = "调用已记录";
+  if (tool.result) status = tool.result.isError ? "失败" : "已结束";
+  else if (tool.live)
+    status = { pending: "待执行", running: "执行中", done: "已结束" }[
+      tool.live.status
+    ];
+  const src = toolSource(tool);
+  const code =
+    src?.key === "code"
+      ? src.text.replace(/^\s*\/\/ @options:[^\n]*\n/, "")
+      : src?.text;
+  const excerpt = code?.trim().split(/\r?\n/, 1)[0];
   return (
     <details
       className="message tool-card"
@@ -145,13 +132,17 @@ export function ToolCard({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <span>
-          工具 · {tool.name} · {status}
+        <span className="tool-line">
+          <strong>{tool.name}</strong>
+          <span
+            className="tool-status"
+            data-error={tool.result?.isError || undefined}
+          >
+            {status}
+          </span>
+          {excerpt && <code className="tool-excerpt">{excerpt}</code>}
         </span>
-        <span className="muted">
-          {size > 0 && ` · 原文 ${size.toLocaleString()} 字节`}
-          {!tool.declaration && " · 调用声明不在当前页"}
-        </span>
+        {!tool.declaration && <small> · 调用声明不在当前页</small>}
         {!!(tool.live?.droppedBytes || tool.live?.droppedLines) && (
           <span className="muted">
             {" "}
@@ -160,42 +151,7 @@ export function ToolCard({
           </span>
         )}
       </summary>
-      {open && (
-        <div className="flow tool-details">
-          <p className="muted identifier">调用 {tool.callId}</p>
-          {tool.declaration && (
-            <section className="flow compact" aria-label="工具参数">
-              <h3>参数</h3>
-              <TextContent
-                text={JSON.stringify(tool.declaration.arguments, null, 2)}
-                reference={tool.declaration.contentReference}
-                format="json"
-                {...bindings}
-              />
-            </section>
-          )}
-          {tool.result && (
-            <section className="flow compact" aria-label="工具结果">
-              <h3>结果</h3>
-              <MessageBody
-                message={tool.result}
-                identity={`${identity}/result`}
-                {...bindings}
-              />
-            </section>
-          )}
-          {!tool.result && tool.live?.output && (
-            <section className="flow compact" aria-label="工具活动输出">
-              <h3>当前输出</h3>
-              <TextContent
-                text={tool.live.output}
-                reference={tool.live.contentReference}
-                {...bindings}
-              />
-            </section>
-          )}
-        </div>
-      )}
+      {open && <ToolDetails tool={tool} identity={identity} {...bindings} />}
     </details>
   );
 }

@@ -68,8 +68,8 @@ export function useConversationInput(
     target.conversationId,
   ]);
   const [pending, setPending] = useState<Pending>(() => restore(key));
-  const [receipt, setReceipt] = useState<PocketInputReceipt | null>(null);
-  const [busy, setBusy] = useState(false);
+
+  const [activity, setActivity] = useState<"send" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const admission = useRef(false);
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
@@ -102,12 +102,34 @@ export function useConversationInput(
           key,
           JSON.stringify({ ...original, receiptId: result.id }),
         );
-      if (alive()) setPending(restore(key));
+      if (alive()) {
+        setPending(restore(key));
+        ui.notice({
+          key: original.requestId,
+          tone: "warning",
+          message: "还不能确认这条消息是否已送达",
+        });
+      }
       return false;
     }
     release(original.requestId);
     if (alive()) {
-      setReceipt(result);
+      const messages = {
+        placed:
+          original.mode === "steer"
+            ? "对话已收到你的补充说明"
+            : original.mode === "followUp"
+              ? "对话已收到你的后续消息"
+              : "对话已收到你的消息",
+        queued: "这条消息已进入队列",
+        done: "这条消息已处理完成",
+        unanswered: "这条消息未获作答",
+      };
+      ui.notice({
+        key: original.requestId,
+        tone: result.status === "unanswered" ? "warning" : "success",
+        message: messages[result.status],
+      });
       changed();
     }
     return result.status !== "unanswered";
@@ -124,7 +146,7 @@ export function useConversationInput(
       return false;
     }
     admission.current = true;
-    setBusy(true);
+    setActivity("send");
     setError(null);
     const original: OriginalInput = {
       requestId: crypto.randomUUID(),
@@ -161,11 +183,23 @@ export function useConversationInput(
           /* Keep the original if local acknowledgement cannot be stored. */
         }
       }
-      if (alive()) setError(describeFailure(reason));
+      if (alive()) {
+        if (
+          reason instanceof PocketRemoteError &&
+          reason.code === "UNKNOWN" &&
+          reason.outcome !== "denied"
+        )
+          ui.notice({
+            key: original.requestId,
+            tone: "warning",
+            message: "还不能确认这条消息是否已送达",
+          });
+        else setError(describeFailure(reason));
+      }
       return false;
     } finally {
       admission.current = false;
-      if (alive()) setBusy(false);
+      if (alive()) setActivity(null);
     }
   }
   async function check() {
@@ -178,7 +212,7 @@ export function useConversationInput(
       return;
     }
     admission.current = true;
-    setBusy(true);
+    setActivity("check");
     setError(null);
     try {
       const options = { signal: requestSignal(ui.signal, connection) };
@@ -211,16 +245,22 @@ export function useConversationInput(
         if (result.receipt) {
           if (accept(result.receipt, original) && alive()) return original.text;
         } else if (alive())
-          setError(
-            "尚未找到原请求回执，请稍后再次核对。原请求仍保留，不能据此重发。",
-          );
+          setError("暂时没查到这条消息的回执，可以稍后再查看发送状态。");
       }
     } catch (reason) {
-      if (alive()) setError(describeFailure(reason));
+      if (alive())
+        setError(`没能读取这条消息的发送状态。${describeFailure(reason)}`);
     } finally {
       admission.current = false;
-      if (alive()) setBusy(false);
+      if (alive()) setActivity(null);
     }
   }
-  return { pending, receipt, busy, error, submit, check };
+  return {
+    pending,
+    busy: !!activity,
+    checking: activity === "check",
+    error,
+    submit,
+    check,
+  };
 }

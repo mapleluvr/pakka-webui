@@ -1,15 +1,26 @@
 import { useLayoutEffect, useMemo, useState, type RefObject } from "react";
+import type { ConversationInputHistory } from "@pakka/protocol/webui";
+import {
+  inlineInputStatus,
+  inputStatus,
+  ownEntryStatuses,
+} from "./input-labels.js";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
-import { MoreIcon } from "./ReadingIcons.js";
+import { MoreIcon, ReadingIcon } from "./ReadingIcons.js";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import type { PocketSnapshot } from "@pakka/protocol/pocket";
 import { TextContent, type ContentBindings } from "./TextContent.js";
-import { MessageBody, ToolCard } from "./ToolCard.js";
-import { rowPreview, transcriptRows } from "./transcript.js";
+import { ErrorRun } from "./ErrorRun.js";
+import { ReplyIssueCard } from "./ReplyIssueCard.js";
+import { ActivityStrip } from "./ActivityStrip.js";
+import { MessageBody } from "./ToolCard.js";
+import { matchRows, transcriptRows } from "./transcript.js";
 import { TranscriptWindow } from "./TranscriptWindow.js";
 
 export function HistoryBody({
   entries,
+  inputs,
+  processingLive,
   live,
   onFork,
   scroll,
@@ -21,6 +32,8 @@ export function HistoryBody({
   scroll: RefObject<HTMLDivElement | null>;
   controls?: HTMLElement | null;
   entries: PocketSnapshot["entries"];
+  inputs: ConversationInputHistory | null;
+  processingLive: boolean;
   live?: PocketSnapshot["live"];
   onFork?(entryId: string): void;
 }) {
@@ -32,14 +45,17 @@ export function HistoryBody({
     () => transcriptRows(entries, live, bindings.conversation),
     [entries, live, bindings.conversation],
   );
-  const selected = useMemo(() => {
-    const needle = query.toLocaleLowerCase();
-    return needle
-      ? rows.filter((row) =>
-          rowPreview(row).toLocaleLowerCase().includes(needle),
-        )
-      : rows;
-  }, [rows, query]);
+  const statusByEntry = useMemo(
+    () =>
+      ownEntryStatuses(
+        entries,
+        inputs,
+        bindings.connection.person.id,
+        bindings.conversation,
+      ),
+    [inputs, entries, bindings.connection.person.id, bindings.conversation],
+  );
+  const selected = useMemo(() => matchRows(rows, query), [rows, query]);
   return (
     <div className="transcript">
       {rows.length > 0 && (
@@ -61,7 +77,7 @@ export function HistoryBody({
           </details>
           {query && (
             <p role="status">
-              {selected.length} / {rows.length} 条内容匹配。
+              {selected.length} / {rows.length} 段内容匹配。
             </p>
           )}
         </div>
@@ -73,22 +89,27 @@ export function HistoryBody({
         controls={controls}
         rows={selected}
         render={(row) => {
-          const menu =
-            onFork && row.entryId ? (
+          const status =
+            row.kind === "message" &&
+            row.message.role === "user" &&
+            row.source === bindings.conversation.conversationId &&
+            row.entryId
+              ? statusByEntry.get(row.entryId)
+              : null;
+          const userLabel = status ? "你" : "用户";
+          const signal = inlineInputStatus(status, processingLive);
+          const forkMenu = (entryId?: string) =>
+            onFork && entryId ? (
               <MoreMenu
                 label="消息操作"
                 icon={<MoreIcon />}
                 alignment="end"
                 items={[
-                  {
-                    label: "从这里分叉",
-                    onClick: () => {
-                      if (row.entryId) onFork(row.entryId);
-                    },
-                  },
+                  { label: "从这里分叉", onClick: () => onFork(entryId) },
                 ]}
               />
             ) : undefined;
+          const menu = forkMenu(row.entryId);
           return (
             <section
               className="history-entry"
@@ -99,14 +120,30 @@ export function HistoryBody({
                   来自分叉源 Conversation {row.source}
                 </p>
               )}
-              {row.kind === "tool" ? (
-                <ToolCard
-                  tool={row.tool}
-                  identity={row.key}
-                  source={row.source}
+              {row.kind === "replyIssue" && (
+                <ErrorRun
+                  items={row.occurrences}
+                  render={(item) =>
+                    item.kind === "replyIssue" && (
+                      <ReplyIssueCard
+                        issue={item.issue}
+                        identity={item.key}
+                        actions={forkMenu(item.entryId)}
+                        {...bindings}
+                      />
+                    )
+                  }
+                />
+              )}
+              {row.kind === "activity" && (
+                <ActivityStrip
+                  group={row}
+                  onFork={onFork}
+                  filtering={!!query}
                   {...bindings}
                 />
-              ) : row.kind === "display" ? (
+              )}
+              {row.kind === "display" && (
                 <div className="message display">
                   <TextContent
                     text={row.display.text}
@@ -114,13 +151,32 @@ export function HistoryBody({
                     {...bindings}
                   />
                 </div>
-              ) : (
+              )}
+              {row.kind === "message" && (
                 <div className={`message message-${row.message.role}`}>
                   <MessageBody
                     heading={
                       <>
-                        {row.message.role === "user" ? "User" : "Assistant"}
-                        {row.isLive && live?.busy && " · 正在生成"}
+                        {row.message.role === "user" ? userLabel : "Assistant"}
+                        {signal && (
+                          <span
+                            className="message-input-status"
+                            data-state={signal}
+                          >
+                            {signal === "processing" ? (
+                              <>
+                                <ReadingIcon name="processing" />
+                                处理中
+                              </>
+                            ) : (
+                              inputStatus[signal]
+                            )}
+                          </span>
+                        )}
+                        {row.message.role === "assistant" &&
+                          row.isLive &&
+                          live?.busy &&
+                          " · 正在生成"}
                       </>
                     }
                     extraActions={menu}
@@ -130,18 +186,13 @@ export function HistoryBody({
                   />
                 </div>
               )}
-              {row.kind !== "message" && menu && (
+              {row.kind === "display" && menu && (
                 <div className="entry-actions">{menu}</div>
               )}
             </section>
           );
         }}
       />
-      {live && (
-        <p role="status" className="muted">
-          {live.busy ? "正在执行" : "当前空闲"}
-        </p>
-      )}
     </div>
   );
 }

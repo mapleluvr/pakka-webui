@@ -20,7 +20,9 @@ import {
 import type { usePakkaConnection } from "../features/identity/usePakkaConnection.js";
 import { useViewNavigation } from "./useViewNavigation.js";
 import { useAppearance } from "../features/settings/appearance.js";
+import { NoticeViewport } from "./NoticeViewport.js";
 import { WorkspaceNavigation } from "./WorkspaceNavigation.js";
+import { DeskDivider } from "../ui/DeskDivider.js";
 import "./workspace.css";
 
 function MenuIcon() {
@@ -116,7 +118,12 @@ export function Application({
           </a>
           <span className="brand-caption">Workspace</span>
         </header>
-        <aside className="sidebar" aria-label="工作区导航">
+        <aside
+          id="workspace-sidebar"
+          className="sidebar"
+          aria-label="工作区导航"
+        >
+          <DeskDivider kind="sidebar" controls="workspace-sidebar" />
           <a className="brand" href="#/" onClick={linkClick}>
             Pakka<span className="brand-caption">Workspace</span>
           </a>
@@ -176,20 +183,11 @@ export function Application({
             />
           ))}
         </main>
-        <section className="notices" aria-label="提示" aria-live="polite">
-          {state.notices.map((item) => (
-            <div key={item.id} className={`notice notice-${item.tone}`}>
-              <p>{item.message}</p>
-              <IconButton
-                className="icon-button"
-                label="关闭提示"
-                icon={<CloseIcon />}
-                variant="ghost"
-                onClick={() => registry.dismiss(item.id)}
-              />
-            </div>
-          ))}
-        </section>
+        <NoticeViewport
+          registry={registry}
+          notices={state.notices}
+          announcement={state.announcement}
+        />
       </div>
       <Dialog
         isOpen={navOpen}

@@ -1,6 +1,54 @@
 .mobile-workspace-heading {
   display: none;
 }
+.desk-divider {
+  display: none;
+}
+@media (min-width: 761px) and (pointer: fine) {
+  .workspace:has(.divider-sidebar) {
+    grid-template-columns: var(--desk-sidebar, 240px) minmax(0, 1fr);
+  }
+  .desk-divider {
+    display: block;
+    position: absolute;
+    z-index: 3;
+    touch-action: none;
+    user-select: none;
+  }
+  .desk-divider:after {
+    content: "";
+    position: absolute;
+    border-radius: 2px;
+    background: var(--app-line);
+  }
+  .desk-divider:is(:hover, :focus-visible, :active):after {
+    background: var(--app-accent);
+  }
+  .divider-sidebar {
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+  }
+  .divider-sidebar:after {
+    inset: 0 0 0 auto;
+    width: 2px;
+  }
+  .divider-draft {
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 9px;
+    cursor: row-resize;
+  }
+  .divider-draft:after {
+    width: 36px;
+    height: 3px;
+    left: calc(50% - 18px);
+    top: 3px;
+  }
+}
 .workspace-navigation {
   display: flex;
   flex-direction: column;

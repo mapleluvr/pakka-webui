@@ -1,523 +1,802 @@
-import { useState } from "react";
-import { Button } from "@astryxdesign/core/Button";
-import { TextInput } from "@astryxdesign/core/TextInput";
-import { TextArea } from "@astryxdesign/core/TextArea";
-import { Selector } from "@astryxdesign/core/Selector";
+import { useEffect, useRef, useState } from "react";
 import type { UiViewProps } from "@pakka/webui-sdk";
-import type {
-  ModelConfigurationEdit,
-  ModelConfigurationPath,
-  ModelConfigurationView,
-} from "@pakka/protocol/webui";
+import type { ModelConfigurationView } from "@pakka/protocol/webui";
 import type { PakkaConnection } from "../../integrations/pakka/connection.js";
 import { useModelConnections } from "./useModelConnections.js";
+import { useConnectionCatalog } from "./useConnectionCatalog.js";
 import {
-  displayValue,
-  editPath,
-  fieldEdit,
-  jsonValue,
+  Compatibility,
+  ModelParameters,
+  TextField,
+  type ModelForm,
+} from "./ModelParameters.js";
+import { ProtocolField, protocolLabel } from "./ProtocolField.js";
+import {
+  applyFields,
+  managed,
+  publicEdit,
   record,
+  replaceField,
   valueAt,
+  type Json,
 } from "./modelFields.js";
+import {
+  labels,
+  locate,
+  modelLayer,
+  newProvider,
+  prepareDraft,
+  savedTarget,
+  type Draft,
+  type Target,
+} from "./connectionDraft.js";
+import { regularLeaf } from "./nativeRows.js";
+import { checkNativeText } from "./nativeFieldValues.js";
+import { AdvancedModelFields } from "./AdvancedModelFields.js";
+import "./model-connections.css";
 
-function ConnectionEditor({
-  view,
-  locked,
-  save,
-}: {
-  view: ModelConfigurationView;
-  locked: boolean;
-  save(
-    edits: readonly ModelConfigurationEdit[],
-    validateOnly?: boolean,
-  ): Promise<void>;
-}) {
-  const providers = record(view.document.providers);
-  const [provider, setProvider] = useState(Object.keys(providers)[0] ?? "");
-  const [model, setModel] = useState("");
-  const [edits, setEdits] = useState<
-    ReadonlyMap<string, ModelConfigurationEdit>
-  >(new Map());
-  const [error, setError] = useState<string | null>(null);
-  const [pathText, setPathText] = useState('["providers", "", "compat"]');
-  const [valueText, setValueText] = useState("{}");
-  const [newId, setNewId] = useState("");
-  const [newUrl, setNewUrl] = useState("");
-  const [newApi, setNewApi] = useState("openai-completions");
-  const [newModel, setNewModel] = useState("");
-  const [override, setOverride] = useState("definition");
-  const config = record(providers[provider]);
-  const models = Array.isArray(config.models) ? config.models : [];
-  const overrides = record(config.modelOverrides);
-  const modelChoices = [
-    ...models.map((value, index) => ({
-      value: `model:${index}`,
-      label: String(record(value).id ?? index),
-    })),
-    ...Object.keys(overrides).map((id) => ({
-      value: `override:${id}`,
-      label: `${id} · 覆盖`,
-    })),
-  ];
-  const prefix = ["providers", provider] as const;
-  const modelPath: ModelConfigurationPath | null = model.startsWith("model:")
-    ? [...prefix, "models", Number(model.slice(6))]
-    : model.startsWith("override:")
-      ? [...prefix, "modelOverrides", model.slice(9)]
-      : null;
-  const protectedPath = (path: ModelConfigurationPath) =>
-    view.protectedPaths.some(
-      (secret) =>
-        path.every((part, i) => secret[i] === part) ||
-        secret.every((part, i) => path[i] === part),
-    );
-  const current = (path: ModelConfigurationPath) => {
-    const changed = edits.get(JSON.stringify(path));
-    return changed
-      ? "value" in changed
-        ? changed.value
-        : undefined
-      : valueAt(view.document, path);
-  };
-  function stage(edit: ModelConfigurationEdit) {
-    if (protectedPath(edit.path)) {
-      setError("此字段包含受保护配置，请由后端维护凭据；未修改该字段。");
-      return;
-    }
-    setEdits((previous) =>
-      new Map(previous).set(JSON.stringify(edit.path), edit),
-    );
-    setError(null);
-  }
-  function field(label: string, path: ModelConfigurationPath, numeric = false) {
-    const protectedValue = protectedPath(path);
-    return (
-      <TextInput
-        key={JSON.stringify(path)}
-        label={label}
-        type="text"
-        inputMode={numeric ? "decimal" : undefined}
-        value={displayValue(current(path))}
-        placeholder={
-          protectedValue ? "由后端保护" : "未覆盖 · 使用原生继承或默认"
-        }
-        isDisabled={locked || protectedValue}
-        controlClassName="touch-control"
-        onChange={(value) => {
-          try {
-            stage(fieldEdit(path, value, numeric));
-          } catch (reason) {
-            setError(reason instanceof Error ? reason.message : "字段无效。");
-          }
-        }}
-      />
-    );
-  }
-  function addProvider() {
-    const id = newId.trim();
-    if (!id || Object.hasOwn(providers, id)) {
-      setError("请输入一个尚未配置的完整 provider ID。");
-      return;
-    }
-    const value = {
-      ...(newUrl.trim() ? { baseUrl: newUrl.trim() } : {}),
-      ...(newApi.trim() ? { api: newApi.trim() } : {}),
-      ...(newModel.trim()
-        ? { models: [{ id: newModel.trim(), name: newModel.trim() }] }
-        : {}),
-    };
-    void save([{ path: ["providers", id], value }]);
-  }
-  function addModel() {
-    const id = newModel.trim();
-    if (!id) {
-      setError("请输入 model ID。");
-      return;
-    }
-    if (override === "override") {
-      if (Object.hasOwn(overrides, id)) {
-        setError("此模型覆盖已存在。");
-        return;
-      }
-      void save([
-        { path: [...prefix, "modelOverrides", id], value: { name: id } },
-      ]);
-    } else {
-      if (models.some((value) => record(value).id === id)) {
-        setError("此模型定义已存在。");
-        return;
-      }
-      void save([
-        { path: [...prefix, "models", models.length], value: { id, name: id } },
-      ]);
-    }
-  }
+const retained = new WeakMap<PakkaConnection, Draft>();
+const describe = (e: unknown) =>
+  e instanceof Error ? e.message : "请检查输入。";
+type Control = ReturnType<typeof useModelConnections>;
+export function ModelConnectionsView(props: UiViewProps<PakkaConnection>) {
+  const state = useModelConnections(props.ui, props.bindings);
   return (
-    <div className="flow">
-      {!!Object.keys(providers).length && (
-        <section className="surface flow">
-          <Selector
-            label="提供商连接"
-            options={Object.keys(providers)}
-            value={provider}
-            presentation="adaptive"
-            controlClassName="touch-control"
-            onChange={(value) => {
-              setProvider(value);
-              setModel("");
-            }}
-          />
-          <div className="form-grid">
-            {field("显示名称", [...prefix, "name"])}
-            {field("API 协议", [...prefix, "api"])}
-            {field("端点 baseUrl", [...prefix, "baseUrl"])}
-          </div>
-          <p className="muted">
-            这里的 localhost 指 Pakka 所在机器。内置 provider
-            可仅覆盖端点，继续使用原目录与认证。
-          </p>
-          <h2>模型参数</h2>
-          <Selector
-            label="模型定义或覆盖"
-            options={modelChoices}
-            value={model || undefined}
-            placeholder="选择一个模型"
-            presentation="adaptive"
-            controlClassName="touch-control"
-            onChange={setModel}
-          />
-          {modelPath && (
-            <>
-              <div className="form-grid">
-                {field("模型名称", [...modelPath, "name"])}
-                {model.startsWith("model:") &&
-                  field("模型级 API", [...modelPath, "api"])}
-                {model.startsWith("model:") &&
-                  field("模型级端点", [...modelPath, "baseUrl"])}
-                {field("上下文窗口", [...modelPath, "contextWindow"], true)}
-                {field("最大输出 token", [...modelPath, "maxTokens"], true)}
-                <Selector
-                  label="支持 Thinking"
-                  value={
-                    current([...modelPath, "reasoning"]) === undefined
-                      ? "inherit"
-                      : current([...modelPath, "reasoning"])
-                        ? "yes"
-                        : "no"
-                  }
-                  options={[
-                    { value: "inherit", label: "使用原生继承或默认" },
-                    { value: "yes", label: "支持" },
-                    { value: "no", label: "不支持" },
-                  ]}
-                  isDisabled={locked}
-                  presentation="adaptive"
-                  onChange={(value) =>
-                    stage(
-                      value === "inherit"
-                        ? { path: [...modelPath, "reasoning"], remove: true }
-                        : {
-                            path: [...modelPath, "reasoning"],
-                            value: value === "yes",
-                          },
-                    )
-                  }
-                />
-                <Selector
-                  label="输入能力"
-                  value={
-                    current([...modelPath, "input"]) === undefined
-                      ? "inherit"
-                      : (
-                            current([
-                              ...modelPath,
-                              "input",
-                            ]) as readonly string[]
-                          )?.includes("image")
-                        ? "image"
-                        : "text"
-                  }
-                  options={[
-                    { value: "inherit", label: "使用原生继承或默认" },
-                    { value: "text", label: "文本" },
-                    { value: "image", label: "文本与图片" },
-                  ]}
-                  isDisabled={locked}
-                  presentation="adaptive"
-                  onChange={(value) =>
-                    stage(
-                      value === "inherit"
-                        ? { path: [...modelPath, "input"], remove: true }
-                        : {
-                            path: [...modelPath, "input"],
-                            value:
-                              value === "image" ? ["text", "image"] : ["text"],
-                          },
-                    )
-                  }
-                />
-              </div>
-              <h3>价格 · USD / 百万 token</h3>
-              <div className="form-grid">
-                {field("输入", [...modelPath, "cost", "input"], true)}
-                {field("输出", [...modelPath, "cost", "output"], true)}
-                {field("缓存读取", [...modelPath, "cost", "cacheRead"], true)}
-                {field("缓存写入", [...modelPath, "cost", "cacheWrite"], true)}
-              </div>
-            </>
-          )}
-          <details className="flow">
-            <summary>添加模型定义或覆盖</summary>
-            <div className="flow compact">
-              <TextInput
-                label="新增 model ID"
-                value={newModel}
-                onChange={setNewModel}
-                controlClassName="touch-control"
-              />
-              <Selector
-                label="配置方式"
-                value={override}
-                onChange={setOverride}
-                options={[
-                  { value: "definition", label: "新增模型定义" },
-                  { value: "override", label: "覆盖已有内置或扩展模型" },
-                ]}
-                presentation="adaptive"
-              />
-              <p className="muted">
-                覆盖只作用于目录中已存在的完整 model
-                ID；新定义使用原生默认参数，保存后可在上方编辑。
-              </p>
-              <Button
-                label="添加模型并保存"
-                isDisabled={locked || !newModel.trim() || edits.size > 0}
-                onClick={addModel}
-              />
-            </div>
-          </details>
-        </section>
-      )}
-      <details className="surface">
-        <summary>添加提供商覆盖或连接</summary>
-        <div className="flow">
-          <div className="form-grid">
-            <TextInput
-              label="Provider ID"
-              value={newId}
-              onChange={setNewId}
-              controlClassName="touch-control"
-            />
-            <TextInput
-              label="新连接端点"
-              value={newUrl}
-              onChange={setNewUrl}
-              controlClassName="touch-control"
-              placeholder="http://localhost:PORT/v1"
-            />
-            <TextInput
-              label="新连接 API"
-              value={newApi}
-              onChange={setNewApi}
-              controlClassName="touch-control"
-            />
-            <TextInput
-              label="首个 model ID（可选）"
-              value={newModel}
-              onChange={setNewModel}
-              controlClassName="touch-control"
-            />
-          </div>
-          <p className="muted">
-            内置 provider ID 表示覆盖；自定义连接需填写
-            API、端点和模型。密钥与认证由受信任的后端配置维护。
-          </p>
-          <Button
-            label="添加连接并保存"
-            isDisabled={locked || !newId.trim() || edits.size > 0}
-            onClick={addProvider}
-          />
-        </div>
-      </details>
-      <details className="surface">
-        <summary>高级原生字段</summary>
-        <div className="flow">
-          <p className="muted">
-            按原生路径编辑 compat、thinkingLevelMap、samplingParams
-            或其他非秘密参数。未编辑字段原样保留。
-          </p>
-          <TextInput
-            label="字段路径 JSON"
-            value={pathText}
-            onChange={setPathText}
-            controlClassName="touch-control"
-          />
-          <TextArea
-            label="字段值 JSON"
-            value={valueText}
-            onChange={setValueText}
-            rows={5}
-          />
-          <div className="actions">
-            <Button
-              label="加入待保存修改"
-              isDisabled={locked}
-              onClick={() => {
-                try {
-                  stage({
-                    path: editPath(pathText),
-                    value: jsonValue(valueText),
-                  });
-                } catch (reason) {
-                  setError(
-                    reason instanceof Error ? reason.message : "字段无效。",
-                  );
-                }
-              }}
-            />
-            <Button
-              label="移除此覆盖"
-              variant="ghost"
-              isDisabled={locked}
-              onClick={() => {
-                try {
-                  stage({ path: editPath(pathText), remove: true });
-                } catch (reason) {
-                  setError(
-                    reason instanceof Error ? reason.message : "路径无效。",
-                  );
-                }
-              }}
-            />
-          </div>
-          <details>
-            <summary>查看脱敏原生配置</summary>
-            <pre>{JSON.stringify(view.document, null, 2)}</pre>
-          </details>
-        </div>
-      </details>
-      {error && (
-        <p role="alert" className="error-text">
-          {error}
-        </p>
-      )}
-      {edits.size > 0 && (
-        <section className="surface flow">
-          <h2>待保存修改 · {edits.size}</h2>
-          <ul className="change-list">
-            {[...edits.entries()].map(([key, edit]) => (
-              <li key={key}>
-                <code>{JSON.stringify(edit.path)}</code>
-                <span>{"remove" in edit ? "恢复继承" : "设置"}</span>
-                <Button
-                  label="撤下修改"
-                  variant="ghost"
-                  isDisabled={locked}
-                  onClick={() =>
-                    setEdits((previous) => {
-                      const next = new Map(previous);
-                      next.delete(key);
-                      return next;
-                    })
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-          <div className="actions">
-            <Button
-              label="校验配置"
-              variant="ghost"
-              isDisabled={locked}
-              onClick={() => {
-                void save([...edits.values()], true);
-              }}
-            />
-            <Button
-              label="保存并重载"
-              isDisabled={locked}
-              onClick={() => {
-                void save([...edits.values()]);
-              }}
-            />
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-export function ModelConnectionsView({
-  ui,
-  bindings,
-}: UiViewProps<PakkaConnection>) {
-  const state = useModelConnections(ui, bindings);
-  return (
-    <section className="flow">
+    <section className="flow model-settings">
       <header className="feature-heading">
         <div className="flow compact">
-          <p className="eyebrow">Settings</p>
+          <p className="eyebrow">实例设置</p>
           <h1>提供商与模型</h1>
         </div>
         <div className="actions">
-          <Button
-            label="重新读取配置"
-            variant="ghost"
-            isDisabled={state.busy}
-            onClick={() => {
-              void state.refresh(false);
-            }}
-          />
-          <Button
-            label="重载已保存配置"
-            variant="ghost"
-            isDisabled={state.busy}
-            onClick={() => {
-              void state.refresh(true);
-            }}
-          />
+          <button
+            disabled={state.busy}
+            onClick={() => void state.refresh(false)}
+          >
+            重新读取配置
+          </button>
+          <button
+            disabled={state.busy || !!state.pending}
+            onClick={() => void state.refresh(true)}
+          >
+            重载已保存配置
+          </button>
         </div>
       </header>
       <p className="muted">
-        实例级连接定义。当前 Conversation 的选择与个人默认分别保存。
+        管理本实例的提供商与模型。在对话里选用模型，在个人设置里选择新对话的默认模型。
       </p>
       {state.error && (
-        <p role="alert" className="error-text">
+        <p className="error-text" role="alert">
           {state.error}
         </p>
       )}
       {state.message && <p role="status">{state.message}</p>}
       {state.pending && (
-        <div className="surface flow">
+        <section className="surface flow compact">
           <p>
             {state.pending === "unreadable"
               ? "原请求记录不可读，请保留本地记录。"
-              : `原请求 ${state.pending.requestId} 的结果尚未确认。`}
+              : `原保存 ${state.pending.requestId} 尚待核对；不会重新提交。`}
           </p>
-          <Button
-            label="核对原配置请求"
-            isDisabled={state.busy || state.pending === "unreadable"}
-            onClick={() => {
-              void state.lookup();
-            }}
-          />
-        </div>
+          <button
+            disabled={state.busy || state.pending === "unreadable"}
+            onClick={() => void state.lookup()}
+          >
+            查看这次保存结果
+          </button>
+        </section>
       )}
-      {!state.view && !state.error && <p role="status">正在读取配置…</p>}
-      {state.view && (
-        <>
-          <p className="muted">
-            配置加载：{state.view.load === "ready" ? "已加载" : "尚未确认"} ·
-            受保护字段 {state.view.protectedPaths.length} 个
-          </p>
-          <ConnectionEditor
-            key={state.view.version}
-            view={state.view}
-            locked={state.busy || !!state.pending}
-            save={state.save}
-          />
-        </>
+      {state.view ? (
+        <ConnectionEditor {...props} view={state.view} state={state} />
+      ) : (
+        !state.error && <p role="status">正在读取配置…</p>
       )}
     </section>
+  );
+}
+function ConnectionEditor({
+  ui,
+  bindings,
+  view,
+  state,
+}: UiViewProps<PakkaConnection> & {
+  view: ModelConfigurationView;
+  state: Control;
+}) {
+  const providers = record(view.document.providers),
+    first = Object.keys(providers)[0];
+  const [target, setTarget] = useState<Target>(
+    () =>
+      retained.get(bindings)?.target ?? {
+        layer: first ? "provider" : "new-provider",
+        provider: first ?? "",
+        model: "",
+      },
+  );
+  const [draft, setDraft] = useState<Draft | null>(
+    () => retained.get(bindings) ?? null,
+  );
+  const [search, setSearch] = useState(""),
+    [discovery, setDiscovery] = useState(""),
+    [compatFilter, setCompatFilter] = useState(""),
+    [mobileList, setMobileList] = useState(!draft),
+    [error, setError] = useState(""),
+    [next, setNext] = useState<Target | null>(null),
+    [reset, setReset] = useState(0);
+  const panel = useRef<HTMLHeadingElement>(null),
+    nav = useRef<HTMLInputElement>(null);
+  // Keep path resolution on the original document until the draft is explicitly discarded.
+  const base = draft?.base ?? view,
+    changes = draft?.changes ?? [],
+    ctx = locate(base, target),
+    { layer, provider, model } = target;
+  const create = newProvider(layer),
+    isModel = modelLayer(layer),
+    isOverride = layer === "override" || layer === "new-override";
+  const currentDraft: Draft = draft ?? { target, base, changes };
+  const readBase =
+    layer === "new-definition" || layer === "new-override" || create
+      ? undefined
+      : ctx.base;
+  const data = applyFields(readBase, changes);
+  const stale = base.version !== view.version,
+    locked = state.busy || !!state.pending,
+    missing =
+      !create &&
+      (!Object.hasOwn(ctx.providers, provider) ||
+        (layer === "definition" && ctx.matches.length !== 1) ||
+        (layer === "override" && ctx.base === undefined));
+  const catalog = useConnectionCatalog(
+    bindings,
+    ui,
+    provider.trim(),
+    "",
+    state.epoch,
+  );
+  const suggestions = useConnectionCatalog(
+    bindings,
+    ui,
+    "",
+    discovery,
+    state.epoch,
+  );
+  const rows =
+      catalog?.models.filter((m) => m.provider === provider.trim()) ?? [],
+    matches = rows.filter((m) => m.id === model.trim()),
+    item = matches.find((m) => m.type === "chat");
+  const nonChat =
+    isModel &&
+    ((matches.length > 0 && !item) ||
+      (data.type !== undefined && data.type !== "chat"));
+  const apis = [...rows, ...(suggestions?.models ?? [])]
+    .filter((m) => m.type === "chat")
+    .map((m) => m.api);
+  const api = isOverride
+    ? (item?.api ?? "")
+    : String(
+        data.api ?? (isModel ? ctx.config.api : undefined) ?? item?.api ?? "",
+      );
+  const overrides = record(ctx.config.modelOverrides);
+  function retain(value: Draft | null) {
+    setDraft(value);
+    if (value) retained.set(bindings, value);
+    else retained.delete(bindings);
+  }
+  function open(t: Target) {
+    retain(null);
+    setTarget(t);
+    setMobileList(false);
+    setError("");
+    setNext(null);
+    setDiscovery("");
+    setCompatFilter("");
+    setReset((n) => n + 1);
+    requestAnimationFrame(() => panel.current?.focus());
+  }
+  function navigate(t: Target) {
+    state.clearFeedback();
+    if (draft) {
+      setNext(t);
+      setMobileList(false);
+    } else open(t);
+  }
+  function changeTarget(key: "model" | "provider", v: string) {
+    state.clearFeedback();
+    const t = { ...target, [key]: v };
+    setTarget(t);
+    retain({ ...currentDraft, target: t });
+    setError("");
+  }
+  useEffect(() => {
+    if (
+      draft &&
+      state.receipt?.state === "saved" &&
+      state.receipt.requestId === draft.requestId &&
+      !state.busy
+    ) {
+      open(savedTarget(draft.target));
+    }
+  }, [state.busy, state.receipt, draft]);
+  useEffect(() => {
+    if (!draft) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [!!draft]);
+  const compatApi = !isModel && compatFilter ? compatFilter : api;
+  const form: ModelForm = {
+    regular: (p) => {
+      const c = changes.find(
+        (c) => JSON.stringify(c.path) === JSON.stringify(p),
+      );
+      return regularLeaf(
+        { provider: !isModel, nonChat, compatApi },
+        p,
+        valueAt(data, p),
+        c,
+      );
+    },
+    value: (p) => valueAt(data, p),
+    change: (p) =>
+      changes.find((c) => JSON.stringify(c.path) === JSON.stringify(p)),
+    protected: (p) => managed(base, [...ctx.path, ...p]),
+    set: (p, v, text, problem) => {
+      state.clearFeedback();
+      try {
+        const full = [...ctx.path, ...p];
+        if (text !== undefined)
+          checkNativeText(
+            full,
+            v && typeof v === "object" ? "json" : "text",
+            text,
+          );
+        try {
+          publicEdit(
+            base,
+            v === undefined
+              ? { path: full, remove: true }
+              : { path: full, value: v },
+          );
+        } catch (e) {
+          if (
+            p.at(-1) === "baseUrl" &&
+            String(describe(e)).startsWith("请输入")
+          )
+            problem = describe(e);
+          else throw e;
+        }
+        const entries = replaceField(
+          changes,
+          { path: p, value: v, text, error: problem },
+          valueAt(readBase, p),
+        );
+        retain(
+          entries.length || create || layer.startsWith("new-")
+            ? { ...currentDraft, changes: entries }
+            : null,
+        );
+        setError("");
+      } catch (e) {
+        setError(describe(e));
+      }
+    },
+  };
+  let issue = "",
+    editCount = 0;
+  if (draft)
+    try {
+      editCount = prepareDraft(currentDraft, catalog).length;
+    } catch (e) {
+      issue = describe(e);
+    }
+  const save = (validateOnly: boolean) => {
+    try {
+      if (stale || !draft) return;
+      void state.save(
+        base.version,
+        prepareDraft(draft, catalog),
+        validateOnly,
+        (id) => retain({ ...draft, requestId: id }),
+      );
+    } catch (e) {
+      setError(describe(e));
+    }
+  };
+  const collision =
+    create && provider.trim() && Object.hasOwn(providers, provider.trim());
+  const overrideChoices = rows.filter(
+    (m) =>
+      m.type === "chat" &&
+      !Object.hasOwn(overrides, m.id) &&
+      !ctx.models.some((v) => record(v).id === m.id),
+  );
+  const targetFor = (layer: Target["layer"], id = ""): Target => ({
+    provider,
+    model: id,
+    layer,
+  });
+  const visibleProviders = Object.keys(providers).filter((id) =>
+    `${id} ${record(providers[id]).name ?? ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+  const protos = (name: string) =>
+    !form.regular(["api"]) ? (
+      <small>{name}：见原生参数</small>
+    ) : (
+      <ProtocolField
+        label={name}
+        value={String(data.api ?? "")}
+        apis={apis}
+        disabled={form.protected(["api"])}
+        onChange={(v) => form.set(["api"], v || undefined)}
+      />
+    );
+  return (
+    <div className="connection-layout" data-list={mobileList}>
+      <aside
+        className="connection-nav surface flow compact"
+        aria-label="已配置提供商"
+      >
+        <h2>提供商</h2>
+        {mobileList && draft && (
+          <button
+            className="resume-mobile"
+            onClick={() => {
+              setMobileList(false);
+              requestAnimationFrame(() => panel.current?.focus());
+            }}
+          >
+            继续编辑草稿 · {provider || "新提供商"}
+          </button>
+        )}
+        <button
+          className="primary-action"
+          disabled={locked}
+          onClick={() =>
+            navigate({ layer: "new-provider", provider: "", model: "" })
+          }
+        >
+          新建提供商
+        </button>
+        <button
+          disabled={locked}
+          onClick={() =>
+            navigate({ layer: "provider-override", provider: "", model: "" })
+          }
+        >
+          覆盖已有提供商
+        </button>
+        <label className="field">
+          搜索已配置提供商
+          <input
+            ref={nav}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+        <div className="connection-list">
+          {visibleProviders.map((id) => (
+            <button
+              key={id}
+              aria-pressed={!create && provider === id}
+              disabled={locked}
+              onClick={() =>
+                layer === "provider" && provider === id
+                  ? (setMobileList(false),
+                    requestAnimationFrame(() => panel.current?.focus()))
+                  : navigate({ layer: "provider", provider: id, model: "" })
+              }
+            >
+              <strong>{String(record(providers[id]).name ?? id)}</strong>
+              {record(providers[id]).name && <small>{id}</small>}
+            </button>
+          ))}
+        </div>
+        {!visibleProviders.length && (
+          <small className="muted">
+            {search ? "未找到匹配的提供商。" : "尚未配置提供商。"}
+          </small>
+        )}
+        {view.load !== "ready" && <small>配置尚未加载。</small>}
+      </aside>
+      <section className="connection-detail flow">
+        <button
+          className="back-list"
+          disabled={locked}
+          onClick={() => {
+            setMobileList(true);
+            requestAnimationFrame(() => nav.current?.focus());
+          }}
+        >
+          返回提供商列表{draft ? "（保留草稿）" : ""}
+        </button>
+        <div className="surface flow">
+          <header>
+            <p className="eyebrow">{create ? "实例提供商" : provider}</p>
+            <h2 tabIndex={-1} ref={panel}>
+              {labels[layer]}
+            </h2>
+            {isModel && model && <strong>{model}</strong>}
+          </header>
+          {next && (
+            <div className="draft-guard" role="alert">
+              <p>当前对象有未保存草稿。切换前请选择：</p>
+              <div className="actions">
+                <button onClick={() => setNext(null)}>
+                  保留草稿，继续编辑
+                </button>
+                <button onClick={() => open(next)}>放弃草稿并切换</button>
+              </div>
+            </div>
+          )}
+          {stale && (
+            <p role="alert">
+              配置版本已变化。草稿仍是原版本，不能直接保存；请复核后放弃旧草稿并按完整身份重新编辑。
+            </p>
+          )}
+          {missing && (
+            <p role="alert">
+              当前文档中目标缺失或身份不唯一，不能按旧位置编辑。
+            </p>
+          )}
+          <fieldset
+            className="flow editor-fields"
+            disabled={locked || !!next || stale || missing}
+            key={`${layer}:${reset}`}
+          >
+            {create && (
+              <>
+                <label className="field">
+                  提供商 ID
+                  <input
+                    value={provider}
+                    onChange={(e) => changeTarget("provider", e.target.value)}
+                  />
+                </label>
+                {layer === "provider-override" && (
+                  <details>
+                    <summary>从目录查找提供商</summary>
+                    <label className="field">
+                      搜索提供商或模型
+                      <input
+                        type="search"
+                        maxLength={256}
+                        value={discovery}
+                        onChange={(e) => setDiscovery(e.target.value)}
+                      />
+                    </label>
+                    <div className="connection-list">
+                      {[
+                        ...new Set(suggestions?.models.map((m) => m.provider)),
+                      ].map((id) => (
+                        <button
+                          key={id}
+                          onClick={() => changeTarget("provider", id)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                    {suggestions && !suggestions.ready && (
+                      <small>目录暂不可读，可输入完整的提供商 ID。</small>
+                    )}
+                    {suggestions?.more && (
+                      <small>当前仅显示部分匹配项，请缩小搜索。</small>
+                    )}
+                  </details>
+                )}
+                {collision ? (
+                  <button
+                    onClick={() =>
+                      navigate({
+                        provider: provider.trim(),
+                        model: "",
+                        layer: "provider",
+                      })
+                    }
+                  >
+                    打开已配置提供商 {provider.trim()}
+                  </button>
+                ) : layer === "new-provider" && rows.length > 0 ? (
+                  <button
+                    onClick={() =>
+                      navigate({ ...target, layer: "provider-override" })
+                    }
+                  >
+                    此 ID 已在目录中 · 转为提供商覆盖
+                  </button>
+                ) : (
+                  provider.trim() &&
+                  catalog &&
+                  (!catalog.ready ||
+                    (layer === "provider-override" && !rows.length)) && (
+                    <small className="muted">
+                      {catalog.ready
+                        ? "当前目录未找到该提供商。"
+                        : "目录暂不可读，请核对提供商 ID。"}
+                    </small>
+                  )
+                )}
+              </>
+            )}
+            {isModel && (
+              <button onClick={() => navigate(targetFor("provider"))}>
+                返回 {provider} 提供商设置
+              </button>
+            )}
+            {layer === "new-definition" ? (
+              <label className="field">
+                新增模型 ID
+                <input
+                  value={model}
+                  onChange={(e) => changeTarget("model", e.target.value)}
+                />
+              </label>
+            ) : layer === "new-override" ? (
+              <label className="field">
+                选择目录模型（完整 ID）
+                <select
+                  aria-label="选择目录模型（完整 ID）"
+                  value={model}
+                  onChange={(e) => changeTarget("model", e.target.value)}
+                >
+                  <option value="">选择 chat 模型</option>
+                  {catalog?.ready &&
+                    overrideChoices.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id} ({m.api})
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ) : null}
+            {isModel && catalog && !catalog.ready && (
+              <small className="muted">
+                {layer === "new-override"
+                  ? "目录暂不可读，请重新读取配置后再选择模型。"
+                  : "目录暂不可读，仍可编辑已保存的公开字段。"}
+              </small>
+            )}
+            {catalog?.ready &&
+              (layer === "definition" ||
+                layer === "override" ||
+                (layer === "new-override" && model)) &&
+              !matches.length && (
+                <small className="muted">当前目录未找到该模型。</small>
+              )}
+            {layer === "new-override" &&
+              catalog?.ready &&
+              !overrideChoices.length && (
+                <small className="muted">
+                  此提供商没有可添加覆盖的聊天模型。
+                </small>
+              )}
+            {isOverride && item && (
+              <small className="muted">
+                目录模型协议：{protocolLabel(item.api)}
+              </small>
+            )}
+            {nonChat ? (
+              <p>非 chat 或未知类型，保留原配置，不使用聊天参数表单。</p>
+            ) : (
+              <>
+                {!create && (
+                  <TextField
+                    form={form}
+                    path={["name"]}
+                    label={isModel ? "模型名称" : "提供商名称"}
+                  />
+                )}
+                {!isOverride && (
+                  <>
+                    {layer !== "provider-override" &&
+                      protos(
+                        isModel
+                          ? "模型级 API"
+                          : create
+                            ? "聊天协议"
+                            : "新增模型的默认协议",
+                      )}
+                    <TextField
+                      form={form}
+                      path={["baseUrl"]}
+                      label={isModel ? "模型级端点" : "服务端点 baseUrl"}
+                    />
+                    <small className="muted">
+                      localhost 指 Pakka 所在机器。
+                      {layer === "provider-override" &&
+                        "只覆盖端点，不改变原目录模型协议与认证。"}
+                    </small>
+                  </>
+                )}
+                {layer === "new-provider" && (
+                  <div className="form-grid">
+                    <label className="field">
+                      首个聊天模型 ID
+                      <input
+                        value={model}
+                        onChange={(e) => changeTarget("model", e.target.value)}
+                      />
+                    </label>
+                    <TextField form={form} path={["name"]} label="提供商名称" />
+                  </div>
+                )}
+                {(!create || layer === "new-provider") && (
+                  <Compatibility
+                    form={form}
+                    api={compatApi}
+                    setFilter={setCompatFilter}
+                    provider={!isModel}
+                    apis={apis}
+                  />
+                )}
+                {isModel && <ModelParameters form={form} api={api} />}
+              </>
+            )}
+            {!create && !isModel && (
+              <section className="flow compact">
+                <h3>模型参数配置</h3>
+                <ConfiguredModelList
+                  models={ctx.models}
+                  overrides={overrides}
+                  select={(layer, id) => navigate(targetFor(layer, id))}
+                />
+                <div className="actions">
+                  <button onClick={() => navigate(targetFor("new-definition"))}>
+                    添加模型定义
+                  </button>
+                  <button onClick={() => navigate(targetFor("new-override"))}>
+                    覆盖目录模型
+                  </button>
+                </div>
+              </section>
+            )}
+            {!create && !missing && (
+              <AdvancedModelFields
+                draft={currentDraft}
+                api={compatApi}
+                nonChat={nonChat}
+                path={ctx.path}
+                readBase={readBase}
+                data={data}
+                update={retain}
+                onChange={state.clearFeedback}
+              />
+            )}
+          </fieldset>
+        </div>
+        {error && (
+          <p role="alert" className="error-text">
+            {error}
+          </p>
+        )}
+        {draft && (
+          <section className="surface flow compact">
+            <h3>
+              未保存草稿 · {provider || "新提供商"}
+              {model && ` / ${model}`}
+            </h3>
+            {(create || layer.startsWith("new-")) && (
+              <p>{labels[layer]} · 新对象将一次添加。</p>
+            )}
+            <ul className="change-list">
+              {changes.map((c) => (
+                <li key={JSON.stringify(c.path)}>
+                  <code>
+                    {JSON.stringify(c.path)} ·{" "}
+                    {c.error
+                      ? "待修正"
+                      : c.value === undefined
+                        ? c.removal === "local"
+                          ? "移除本层配置"
+                          : "恢复继承"
+                        : `设置为 ${JSON.stringify(c.value)}`}
+                  </code>
+                  <button
+                    disabled={locked}
+                    onClick={() => {
+                      const left = changes.filter((e) => e !== c);
+                      retain(
+                        left.length || create || layer.startsWith("new-")
+                          ? { ...draft, changes: left }
+                          : null,
+                      );
+                      setError("");
+                    }}
+                  >
+                    撤下修改
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {issue && <p role="status">{issue}</p>}
+            <div className="actions">
+              <button
+                disabled={locked || !editCount || stale || missing || !!next}
+                onClick={() => save(true)}
+              >
+                校验配置
+              </button>
+              <button
+                className="primary-action"
+                disabled={locked || !editCount || stale || missing || !!next}
+                onClick={() => save(false)}
+              >
+                保存并重载
+              </button>
+              <button
+                disabled={locked}
+                onClick={() =>
+                  open(
+                    create || layer.startsWith("new-")
+                      ? {
+                          ...target,
+                          provider: create ? "" : provider,
+                          model: "",
+                        }
+                      : target,
+                  )
+                }
+              >
+                放弃草稿
+              </button>
+            </div>
+          </section>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ConfiguredModelList({
+  models,
+  overrides,
+  select,
+}: {
+  models: readonly Json[];
+  overrides: Record<string, Json>;
+  select(layer: "definition" | "override", id: string): void;
+}) {
+  const ids = models.map((model) => record(model).id);
+  const sharedId = ids.some(
+    (id) => typeof id === "string" && Object.hasOwn(overrides, id),
+  );
+  const definitions = ids.map((id, index) =>
+    typeof id === "string" ? (
+      <button key={index} onClick={() => select("definition", id)}>
+        {id}
+      </button>
+    ) : (
+      <small key={index}>未识别模型条目（已保留）</small>
+    ),
+  );
+  const entries = Object.keys(overrides).map((id) => (
+    <button key={id} onClick={() => select("override", id)}>
+      {id}
+    </button>
+  ));
+  return (
+    <div className="connection-list">
+      {sharedId ? (
+        <>
+          <fieldset className="editor-fields flow compact">
+            <legend>模型定义</legend>
+            {definitions}
+          </fieldset>
+          <fieldset className="editor-fields flow compact">
+            <legend>目录模型覆盖</legend>
+            {entries}
+          </fieldset>
+        </>
+      ) : (
+        <>
+          {definitions}
+          {entries}
+        </>
+      )}
+    </div>
   );
 }

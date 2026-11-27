@@ -12,7 +12,11 @@ import type {
 } from "@pakka/protocol/pocket";
 import { viewHref } from "../../host/links.js";
 import { conversationResource } from "../../integrations/pakka/resources.js";
-import { useWorkspaceChange } from "../../integrations/pakka/useWorkspaceChange.js";
+import { workspaceFeedback } from "./workspace-feedback.js";
+import {
+  useWorkspaceChange,
+  type WorkspaceOriginal,
+} from "../../integrations/pakka/useWorkspaceChange.js";
 import {
   describeFailure,
   requestSignal,
@@ -43,7 +47,7 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
   const [reopening, setReopening] = useState<string | null>(null);
   const [awaitingReopenRead, setAwaitingReopenRead] = useState(false);
   const reopenCheck = useRef<{ id: string } | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const change = useWorkspaceChange(ui, bindings, "workspace");
   const blocked = change.busy || !!change.pending;
   const alive = () => !ui.signal.aborted && !bindings.signal.aborted;
@@ -75,12 +79,15 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
         if (checkingReopen && reopenCheck.current === checkingReopen) {
           reopenCheck.current = null;
           setAwaitingReopenRead(false);
-          setNotice(
-            sessionList.sessions.find((row) => row.id === checkingReopen.id)
-              ?.status === "ready"
-              ? "原 Session 已重新打开。"
-              : "已重新读取 Session 状态，请按当前状态继续。",
-          );
+          ui.notice({
+            tone: "info",
+            key: `reopen:${checkingReopen.id}`,
+            message:
+              sessionList.sessions.find((row) => row.id === checkingReopen.id)
+                ?.status === "ready"
+                ? "Session 已重新打开"
+                : "已刷新 Session 状态",
+          });
         }
       })
       .catch((reason) => {
@@ -97,15 +104,22 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
     return () => controller.abort();
   }, [bindings, ui, refresh]);
   useEffect(() => setOffset(0), [selected, folder, archived, search]);
-  async function complete(result: PocketClientResult | undefined) {
-    if (!result || !alive()) return;
+  async function complete(
+    confirmation:
+      | { result: PocketClientResult; original: WorkspaceOriginal }
+      | undefined,
+  ) {
+    if (!confirmation || !alive()) return;
+    const { result, original } = confirmation;
     setEditor(null);
     setRefresh((value) => value + 1);
-    setNotice("已核对原操作结果。");
-    if (result.kind === "managed.session" && result.session) {
+    ui.notice({
+      tone: "success",
+      key: original.requestId,
+      message: workspaceFeedback(original).confirmed,
+    });
+    if (result.kind === "managed.session" && result.session)
       setSelected(result.session.id);
-      setNotice("Session 已创建；可在这个 Session 中新建 Conversation。");
-    }
     const ref =
       result.kind === "reference"
         ? result.ref
@@ -121,14 +135,29 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
   async function personal(action: PocketNavigationAction) {
     if (!navigation) return;
     await complete(
-      await change.run({
-        op: "navigation.update",
-        input: {
-          requestId: crypto.randomUUID(),
-          expectedVersion: navigation.version,
-          action,
+      await change.run(
+        {
+          op: "navigation.update",
+          input: {
+            requestId: crypto.randomUUID(),
+            expectedVersion: navigation.version,
+            action,
+          },
         },
-      }),
+        {
+          folderName:
+            "folderId" in action
+              ? navigation.folders.find((row) => row.id === action.folderId)
+                  ?.name
+              : undefined,
+          conversationName:
+            action.kind === "assign"
+              ? listing?.navigation?.find(
+                  (row) => row.resourceId === action.resourceId,
+                )?.name
+              : undefined,
+        },
+      ),
     );
   }
   async function save() {
@@ -194,11 +223,14 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
       if (result.kind !== "session.state")
         throw new Error("Session 重开结果未确认。");
       if (alive()) {
-        setNotice(
-          result.session.status === "ready"
-            ? "原 Session 已重新打开。"
-            : "Session 状态仍需核对。",
-        );
+        ui.notice({
+          tone: "info",
+          key: `reopen:${id}`,
+          message:
+            result.session.status === "ready"
+              ? "Session 已重新打开"
+              : "Session 尚未就绪，请刷新工作台查看状态",
+        });
         setSessions((current) =>
           current
             ? {
@@ -215,7 +247,7 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
       if (alive()) {
         reopenCheck.current = { id };
         setAwaitingReopenRead(true);
-        setNotice("重开结果未确认，请刷新工作台核对原 Session 状态。");
+
         setError(describeFailure(reason));
       }
     } finally {
@@ -294,16 +326,30 @@ export function WorkspaceView({ ui, bindings }: UiViewProps<PakkaConnection>) {
           {error ?? change.error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
-      {change.pending && (
+      {awaitingReopenRead && (
+        <p role="status">
+          还不能确认 Session 是否已重新打开。请刷新工作台查看状态。
+        </p>
+      )}
+      {(!change.busy || change.checking) && change.pending && (
         <div className="surface flow compact">
           <p>
             {change.pending === "unreadable"
-              ? "原操作记录不可读，请保留记录。"
-              : `原请求 ${change.pending.requestId} 尚未确认。`}
+              ? "本地保存记录不可读。请保留记录，不要重复保存。"
+              : `还不能确认是否${workspaceFeedback(change.pending).confirmed}。`}
           </p>
+          {change.pending !== "unreadable" && (
+            <details>
+              <summary>保存详情</summary>
+              <p className="identifier">请求号 {change.pending.requestId}</p>
+            </details>
+          )}
           <Button
-            label="核对工作台原请求"
+            label={
+              change.pending === "unreadable"
+                ? "无法查看保存状态"
+                : workspaceFeedback(change.pending).lookup
+            }
             isDisabled={change.busy || change.pending === "unreadable"}
             onClick={() => {
               void change.run().then(complete);

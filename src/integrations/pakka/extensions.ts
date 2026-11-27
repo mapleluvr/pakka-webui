@@ -106,18 +106,21 @@ export function attachPakkaExtensions(
     string,
     { resource: string; loading: Promise<void> }
   >();
-  const failures = new Set<string>();
+  const failures = new Map<string, string>();
   let backend = new Map<string, ExtensionRegistration>();
   let discovered = new Map<string, ExtensionRegistration>();
   let refreshing: Promise<void> | null = null;
   function report(id: string, generation: string, reason: unknown) {
     const key = `${id}:${generation}`;
     if (signal.aborted || failures.has(key)) return;
-    failures.add(key);
-    registry.notice({
-      tone: "warning",
-      message: `${id}：${reason instanceof Error ? reason.message : "插件界面未能载入。"}`,
-    });
+    failures.set(
+      key,
+      registry.notice({
+        key: JSON.stringify([scope?.instanceId, id, generation]),
+        tone: "warning",
+        message: `${id}：${reason instanceof Error ? reason.message : "插件界面未能载入。"}`,
+      }),
+    );
   }
   function remove(id: string) {
     publications.delete(id);
@@ -419,6 +422,8 @@ export function attachPakkaExtensions(
     },
     dispose() {
       lifetime.abort();
+      for (const event of failures.values()) registry.dismiss(event);
+      failures.clear();
       window.clearInterval(timer);
       window.removeEventListener("focus", update);
       const errors: unknown[] = [];

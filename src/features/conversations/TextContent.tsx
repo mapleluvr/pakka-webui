@@ -2,9 +2,10 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
+  useId,
   type ReactNode,
 } from "react";
+import { useUiContext } from "@pakka/webui-sdk/react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@astryxdesign/core/Button";
@@ -25,12 +26,18 @@ function CopyButton({
   text,
   label = "复制显示内容",
   compact = false,
+  confirmation,
 }: {
   text: () => string;
   label?: string;
   compact?: boolean;
+  confirmation?: string;
 }) {
-  const [notice, setNotice] = useState("");
+  const ui = useUiContext();
+  const key = useId();
+  const report = (tone: "success" | "error", message: string) => {
+    if (active.current && !ui.signal.aborted) ui.notice({ key, tone, message });
+  };
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
@@ -38,17 +45,18 @@ function CopyButton({
       active.current = false;
     };
   }, []);
+  const feedback = compact ? "已复制消息预览" : "已复制显示内容";
   const copy = () => {
     if (!navigator.clipboard) {
-      setNotice("当前浏览器无法复制，请选择文字后复制。");
+      report("error", "当前浏览器无法复制，请选择文字后复制");
       return;
     }
     void navigator.clipboard.writeText(text()).then(
       () => {
-        if (active.current) setNotice("已复制。");
+        report("success", confirmation ?? feedback);
       },
       () => {
-        if (active.current) setNotice("未能复制，请检查浏览器权限。");
+        report("error", "未能复制，请检查浏览器权限");
       },
     );
   };
@@ -57,17 +65,13 @@ function CopyButton({
       {compact ? (
         <IconButton
           label={label}
+          tooltip={label}
           icon={<CopyIcon />}
           variant="ghost"
           onClick={copy}
         />
       ) : (
         <Button label={label} variant="ghost" onClick={copy} />
-      )}
-      {notice && (
-        <span role="status" className="muted">
-          {notice}
-        </span>
       )}
     </div>
   );
@@ -78,11 +82,10 @@ function CodeBlock({ children }: { children?: ReactNode }) {
     <div className="code-block">
       <CopyButton
         label="复制代码"
+        confirmation="已复制代码"
         text={() => node.current?.textContent ?? ""}
       />
-      <pre ref={node} tabIndex={0}>
-        {children}
-      </pre>
+      <pre ref={node}>{children}</pre>
     </div>
   );
 }
@@ -106,7 +109,7 @@ const markdownComponents = {
       <span>{alt || "图片链接不可用"}</span>
     ),
   table: ({ children }: { children?: ReactNode }) => (
-    <div className="markdown-table" tabIndex={0}>
+    <div className="markdown-table">
       <table>{children}</table>
     </div>
   ),
@@ -127,10 +130,43 @@ export function ContentHeading({
   );
 }
 
+function Frame({ title, children }: { title?: string; children: ReactNode }) {
+  if (title)
+    return (
+      <section className="content-body tool-panel" aria-label={title}>
+        {children}
+      </section>
+    );
+  return <div className="content-body flow compact">{children}</div>;
+}
+function Preview({
+  text,
+  format,
+}: {
+  text: string;
+  format: "markdown" | "json" | "text";
+}) {
+  if (format === "markdown")
+    return (
+      <div className="markdown-body">
+        <Markdown
+          skipHtml
+          remarkPlugins={[remarkGfm]}
+          components={markdownComponents}
+        >
+          {text}
+        </Markdown>
+      </div>
+    );
+  if (format === "json") return <pre>{text}</pre>;
+  return <p className="message-text">{text}</p>;
+}
 export function TextContent({
   text,
   reference,
   format = "text",
+  panel,
+  preview,
   heading,
   extraActions,
   ...bindings
@@ -140,6 +176,8 @@ export function TextContent({
   text: string;
   reference?: PocketContentReference;
   format?: "markdown" | "text" | "json";
+  panel?: { title: string; originalTitle?: string };
+  preview?: ReactNode;
 }) {
   const [open, setOpen] = useOriginalDisclosure(
     `text:${JSON.stringify([bindings.conversation, reference])}`,
@@ -170,16 +208,25 @@ export function TextContent({
     if (open) closeOriginal();
     else setOpen(true);
   }
+  const originalTitle = panel?.originalTitle ?? panel?.title ?? "";
+  const originalLabel = open ? "收起原文" : `${originalTitle}原文与搜索`;
   const actions = (
     <>
       {!(open && original) && (
-        <CopyButton text={() => text} compact={Boolean(heading)} />
+        <CopyButton
+          text={() => text}
+          compact={Boolean(heading || panel)}
+          label={panel ? `复制${panel.title}预览` : undefined}
+          confirmation={panel ? `已复制${panel.title}预览` : undefined}
+        />
       )}
       {original &&
-        (heading ? (
+        (heading || panel ? (
           <IconButton
             ref={originalToggle}
-            label={open ? "收起原文" : "原文与搜索"}
+            label={originalLabel}
+            tooltip={originalLabel}
+            aria-expanded={open}
             icon={<OriginalIcon />}
             variant="ghost"
             onClick={toggleOriginal}
@@ -196,7 +243,7 @@ export function TextContent({
     </>
   );
   return (
-    <div className="content-body flow compact">
+    <Frame title={panel?.title}>
       {open &&
         original &&
         controls &&
@@ -209,24 +256,17 @@ export function TextContent({
           />,
           controls,
         )}
-      {heading && <ContentHeading heading={heading}>{actions}</ContentHeading>}
+      {panel ? (
+        <header className="tool-panel-heading">
+          <h4>{open && original ? `${originalTitle}原文` : panel.title}</h4>
+          <div className="tool-panel-actions">{actions}</div>
+        </header>
+      ) : (
+        heading && <ContentHeading heading={heading}>{actions}</ContentHeading>
+      )}
       {!(open && original) &&
-        (format === "markdown" ? (
-          <div className="markdown-body">
-            <Markdown
-              skipHtml
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
-            >
-              {text}
-            </Markdown>
-          </div>
-        ) : format === "json" ? (
-          <pre tabIndex={0}>{text}</pre>
-        ) : (
-          <p className="message-text">{text}</p>
-        ))}
-      {!heading && <div className="actions">{actions}</div>}
+        (preview ?? <Preview text={text} format={panel ? "json" : format} />)}
+      {!heading && !panel && <div className="actions">{actions}</div>}
       {!open && reference && !reference.previewComplete && (
         <p className="muted">
           当前显示的是预览。
@@ -248,6 +288,6 @@ export function TextContent({
           />
         </div>
       )}
-    </div>
+    </Frame>
   );
 }

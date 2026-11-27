@@ -37,6 +37,38 @@ function Playground({ ui }: UiViewProps) {
           <textarea placeholder="试着输入，再打开另一个实例" rows={4} />
         </label>
       </div>
+      <div className="surface flow">
+        <h2>操作反馈</h2>
+        <p className="muted">
+          试着重复点击同一示例，或切换到窄屏查看最新一条。
+        </p>
+        <div className="actions">
+          <Button
+            label="成功示例"
+            onClick={() =>
+              ui.notice({ tone: "success", message: "组件已响应" })
+            }
+          />
+          <Button
+            label="信息示例"
+            onClick={() =>
+              ui.notice({
+                tone: "info",
+                message: "实验室的草稿只保留在当前页面",
+              })
+            }
+          />
+          <Button
+            label="警告示例"
+            onClick={() =>
+              ui.notice({
+                tone: "warning",
+                message: "关闭这个实验室页面后，临时草稿和计数不会保留",
+              })
+            }
+          />
+        </div>
+      </div>
       <Dialog
         isOpen={open}
         onOpenChange={setOpen}
