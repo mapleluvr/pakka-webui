@@ -93,11 +93,11 @@ const peopleSettings = defineUiPlugin<PakkaConnection>({
   runtime: "react19-astryx0.7.15",
   id: "people-settings",
   version: "0.1.0",
-  title: "人员与邀请",
+  title: "设备与访问",
   views: [
     {
       id: "people",
-      title: "人员与邀请",
+      title: "设备与访问",
       placement: "settings",
       navigation: true,
       render: PeopleView,

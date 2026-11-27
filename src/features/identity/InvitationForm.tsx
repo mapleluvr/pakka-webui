@@ -22,19 +22,23 @@ export function InvitationForm({
   people,
   resources,
   refresh,
+  personal = false,
 }: {
   ui: UiContext;
   connection: PakkaConnection;
   people: readonly PocketPerson[];
   resources: readonly PocketNavigation[];
   refresh(): void;
+  personal?: boolean;
 }) {
   const invitation = useInvitation(ui, connection);
   const restored =
     invitation.pending && invitation.pending !== "unreadable"
       ? invitation.pending
       : null;
-  const [personId, setPersonId] = useState(restored?.personId ?? "");
+  const [personId, setPersonId] = useState(
+    restored?.personId ?? (personal ? connection.person.id : ""),
+  );
   const [role, setRole] = useState<PocketRole>(restored?.role ?? "viewer");
   const [all, setAll] = useState(restored?.resources === "*");
   const [selected, setSelected] = useState<readonly string[]>(
@@ -62,9 +66,11 @@ export function InvitationForm({
   }
   return (
     <section className="surface flow" aria-label="创建邀请">
-      <h2>邀请与新设备登录</h2>
+      <h2>{personal ? "连接我的设备" : "邀请与新设备登录"}</h2>
       <p className="muted">
-        邀请仅可兑换一次，过期后失效。为已有成员创建邀请时沿用其当前角色与资源授权。
+        {personal
+          ? "在另一台设备打开一次性链接或扫描二维码，即可接续你的工作。"
+          : "邀请仅可兑换一次，过期后失效。为已有成员创建邀请时沿用其当前角色与资源授权。"}
       </p>
       {invitation.error && (
         <p role="alert" className="error-text">
@@ -113,122 +119,137 @@ export function InvitationForm({
             .then(refresh);
         }}
       >
-        <Selector
-          label="邀请对象"
-          value={personId}
-          onChange={setPersonId}
-          isDisabled={blocked}
-          controlClassName="touch-control"
-          options={[
-            { value: "", label: "新成员" },
-            ...people
-              .filter((person) => person.active)
-              .map((person) => ({
-                value: person.id,
-                label: `${person.name} · ${person.id.slice(0, 8)}`,
-              })),
-          ]}
-        />
-        {personId && !target && (
-          <p role="alert">原成员已不可用，请刷新并核对身份。</p>
-        )}
-        {target ? (
-          <p>
-            当前角色：{roleNames[target.role]}；资源：
-            {target.resources === "*"
-              ? "全部 Conversation"
-              : target.resources
-                  .map(
-                    (id) =>
-                      resources.find((row) => row.resourceId === id)?.name ??
-                      id,
-                  )
-                  .join("、")}
-            。
-          </p>
-        ) : (
+        {!personal && (
           <>
             <Selector
-              label="成员角色"
-              value={role}
-              onChange={(value) => {
-                if (
-                  value === "viewer" ||
-                  value === "sender" ||
-                  value === "driver" ||
-                  value === "admin"
-                )
-                  setRole(value);
-              }}
+              label="邀请对象"
+              value={personId}
+              onChange={setPersonId}
               isDisabled={blocked}
               controlClassName="touch-control"
-              options={Object.entries(roleNames).map(([value, label]) => ({
-                value,
-                label,
-              }))}
+              options={[
+                { value: "", label: "新成员" },
+                ...people
+                  .filter((person) => person.active)
+                  .map((person) => ({
+                    value: person.id,
+                    label: `${person.name} · ${person.id.slice(0, 8)}`,
+                  })),
+              ]}
             />
-            <p className="muted">
-              只读仅浏览；可发送增加普通输入；可调度增加插入、后续输入与停止。管理员可管理已授权对象；实例管理另需全部资源授权。
-            </p>
-            <fieldset className="flow">
-              <legend>Conversation 访问范围</legend>
-              <label className="actions">
-                <input
-                  type="checkbox"
-                  checked={all}
-                  disabled={blocked}
-                  onChange={(event) => setAll(event.target.checked)}
+            {personId && !target && (
+              <p role="alert">原成员已不可用，请刷新并核对身份。</p>
+            )}
+            {target ? (
+              <p>
+                当前角色：{roleNames[target.role]}；资源：
+                {target.resources === "*"
+                  ? "全部 Conversation"
+                  : target.resources
+                      .map(
+                        (id) =>
+                          resources.find((row) => row.resourceId === id)
+                            ?.name ?? id,
+                      )
+                      .join("、")}
+                。
+              </p>
+            ) : (
+              <>
+                <Selector
+                  label="成员角色"
+                  value={role}
+                  onChange={(value) => {
+                    if (
+                      value === "viewer" ||
+                      value === "sender" ||
+                      value === "driver" ||
+                      value === "admin"
+                    )
+                      setRole(value);
+                  }}
+                  isDisabled={blocked}
+                  controlClassName="touch-control"
+                  options={Object.entries(roleNames).map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
                 />
-                全部 Conversation（包括之后创建的对象）
-              </label>
-              {!all && (
-                <div className="flow compact">
-                  {resources
-                    .filter((row) => row.resourceId)
-                    .map((row) => (
-                      <label className="actions" key={row.resourceId}>
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(row.resourceId!)}
-                          disabled={blocked}
-                          onChange={(event) =>
-                            setSelected((current) =>
-                              event.target.checked
-                                ? [...current, row.resourceId!]
-                                : current.filter((id) => id !== row.resourceId),
-                            )
-                          }
-                        />
-                        <span>
-                          {row.name} · {row.ref.sessionId.slice(0, 8)}
-                          {" / "}
-                          {row.ref.conversationId}
-                        </span>
-                      </label>
-                    ))}
-                  {resources.every((row) => !row.resourceId) && (
-                    <p>暂无可选择的授权资源。</p>
+                <p className="muted">
+                  只读仅浏览；可发送增加普通输入；可调度增加插入、后续输入与停止。管理员可管理已授权对象；实例管理另需全部资源授权。
+                </p>
+                <fieldset className="flow">
+                  <legend>Conversation 访问范围</legend>
+                  <label className="actions">
+                    <input
+                      type="checkbox"
+                      checked={all}
+                      disabled={blocked}
+                      onChange={(event) => setAll(event.target.checked)}
+                    />
+                    全部 Conversation（包括之后创建的对象）
+                  </label>
+                  {!all && (
+                    <div className="flow compact">
+                      {resources
+                        .filter((row) => row.resourceId)
+                        .map((row) => (
+                          <label className="actions" key={row.resourceId}>
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(row.resourceId!)}
+                              disabled={blocked}
+                              onChange={(event) =>
+                                setSelected((current) =>
+                                  event.target.checked
+                                    ? [...current, row.resourceId!]
+                                    : current.filter(
+                                        (id) => id !== row.resourceId,
+                                      ),
+                                )
+                              }
+                            />
+                            <span>
+                              {row.name} · {row.ref.sessionId.slice(0, 8)}
+                              {" / "}
+                              {row.ref.conversationId}
+                            </span>
+                          </label>
+                        ))}
+                      {resources.every((row) => !row.resourceId) && (
+                        <p>暂无可选择的授权资源。</p>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </fieldset>
+                </fieldset>
+              </>
+            )}
           </>
         )}
-        <Selector
-          label="邀请有效期"
-          value={ttlMs}
-          onChange={setTtlMs}
-          isDisabled={blocked}
-          controlClassName="touch-control"
-          options={[
-            { value: "3600000", label: "1 小时" },
-            { value: "86400000", label: "1 天" },
-            { value: "604800000", label: "7 天" },
-          ]}
-        />
+        <details open={personal ? undefined : true}>
+          <summary>链接选项</summary>
+          <Selector
+            label="有效期"
+            value={ttlMs}
+            onChange={setTtlMs}
+            isDisabled={blocked}
+            controlClassName="touch-control"
+            options={[
+              { value: "3600000", label: "1 小时" },
+              { value: "86400000", label: "1 天" },
+              { value: "604800000", label: "7 天" },
+            ]}
+          />
+        </details>
         <div>
           <Button
-            label={invitation.busy ? "正在处理邀请…" : "创建一次性邀请"}
+            label={
+              invitation.busy
+                ? "正在创建…"
+                : personal
+                  ? "创建设备连接链接"
+                  : "创建一次性邀请"
+            }
             type="submit"
             isDisabled={
               blocked ||
@@ -240,7 +261,7 @@ export function InvitationForm({
       </form>
       {result && (
         <section className="flow" aria-label="已确认邀请">
-          <h3>原邀请已确认</h3>
+          <h3>{personal ? "设备连接链接已创建" : "邀请已创建"}</h3>
           <p className="identifier">{result.invite.id}</p>
           <p>
             有效期至 {new Date(result.invite.expiresAt).toLocaleString()}
@@ -256,9 +277,9 @@ export function InvitationForm({
           {link ? (
             <>
               <label className="field">
-                邀请链接
+                {personal ? "设备连接链接" : "邀请链接"}
                 <input
-                  aria-label="邀请链接"
+                  aria-label={personal ? "设备连接链接" : "邀请链接"}
                   type="password"
                   value={link}
                   readOnly
@@ -266,13 +287,16 @@ export function InvitationForm({
                 />
               </label>
               <div>
-                <Button label="复制邀请链接" onClick={() => void copy()} />
+                <Button
+                  label={personal ? "复制设备连接链接" : "复制邀请链接"}
+                  onClick={() => void copy()}
+                />
               </div>
               {copyStatus && <p role="status">{copyStatus}</p>}
               {result.qr && (
                 <img
                   src={result.qr}
-                  alt="一次性邀请二维码"
+                  alt={personal ? "设备连接二维码" : "一次性邀请二维码"}
                   width="256"
                   height="256"
                 />

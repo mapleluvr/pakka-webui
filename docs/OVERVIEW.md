@@ -4,7 +4,9 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的产品与架构见 [W
 
 ## 当前交付
 
-阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 5 / workbench 3 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
+[个人模式与设备](changes/personal-mode.md)承接同一身份多端使用、独立设备撤销、可选预算备注和协作界面简化。
+
+阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 6 / workbench 3 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
 
 [Session 预算](changes/session-budget.md)按项以 0 表示不限制，显示宿主的实际配置和用量。本轮交互与预算组合的候选身份、验证范围和本地证据包见[交付核对](verification/INTERFACE-REFINEMENT.md)。
 

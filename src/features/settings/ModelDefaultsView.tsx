@@ -80,10 +80,10 @@ export function ModelDefaultsView({
       <header className="feature-heading">
         <div className="flow compact">
           <p className="eyebrow">Settings</p>
-          <h1>个人模型默认</h1>
+          <h1>新对话默认模型</h1>
         </div>
         <Button
-          label="重新读取默认"
+          label="刷新默认设置"
           variant="ghost"
           isDisabled={busy}
           onClick={() => {
@@ -94,8 +94,8 @@ export function ModelDefaultsView({
         />
       </header>
       <p className="muted">
-        按 Person 在后端保存并跨设备使用；仅为本人新建且未指定配置的
-        Conversation 提供默认值。
+        你在各台设备新建对话时使用这组默认设置。已有对话保留各自的模型与
+        Thinking。
       </p>
       {error && (
         <p role="alert" className="error-text">
@@ -111,7 +111,7 @@ export function ModelDefaultsView({
               : `原请求 ${pending.requestId} 尚未确认。`}
           </p>
           <Button
-            label="核对原默认请求"
+            label="查看保存结果"
             isDisabled={busy || pending === "unreadable"}
             onClick={() => {
               void personal.lookup().then((ok) => {
@@ -123,7 +123,7 @@ export function ModelDefaultsView({
       )}
       {defaults && (
         <div className="surface flow">
-          <h2>启动选择</h2>
+          <h2>模型与 Thinking</h2>
           <div className="actions">
             <Button
               label={model ? `默认模型 · ${modelKey(model)}` : "选择默认模型"}
@@ -165,7 +165,7 @@ export function ModelDefaultsView({
               : `已保存：${defaults.model ? modelKey(defaults.model) : "跟随实例"} · Thinking：${defaults.thinkingLevel ?? "使用原生默认"}`}
           </p>
           <Button
-            label="保存个人默认"
+            label="保存默认设置"
             isDisabled={busy || !!pending || !dirty}
             onClick={() => {
               void personal
