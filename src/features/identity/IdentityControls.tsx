@@ -167,5 +167,5 @@ export function useIdentityControls(props: {
       />
     </Dialog>
   );
-  return { controls, dialog };
+  return { controls, dialog, openLogin: () => setOpen(true) };
 }

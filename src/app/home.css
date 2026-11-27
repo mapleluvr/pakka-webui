@@ -1,0 +1,212 @@
+.brand-mark {
+  display: inline-block;
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.home {
+  width: min(100%, 800px);
+  margin: 0 auto;
+  padding: clamp(56px, 14dvh, 160px) 48px 48px;
+}
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.home-hero > .brand-mark {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 24px;
+}
+.home h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(40px, 4.6vw, 56px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+.home h1 em {
+  font-weight: inherit;
+}
+.home-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 48px;
+  margin-top: 30px;
+  padding: 12px 22px;
+  border: 1px solid var(--app-text);
+  border-radius: 12px;
+  background: var(--app-text);
+  color: var(--app-background);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.home-primary:hover {
+  opacity: 0.85;
+}
+.home-primary:disabled {
+  opacity: 0.65;
+}
+.home-unavailable {
+  max-width: 36rem;
+  margin-top: 20px;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+.home-conversations {
+  margin-top: 48px;
+}
+.home-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.home-section-heading h2 {
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+.home-section-heading > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+  border-radius: 6px;
+}
+.home a:hover {
+  text-decoration: none;
+}
+.home-section-heading > a:hover,
+.home-shortcuts > a:hover {
+  color: var(--app-text);
+}
+.home-conversation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--app-line);
+}
+.home-conversation-list li + li {
+  border-top: 1px solid var(--app-line);
+}
+.home-conversation-list a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 68px;
+  padding: 12px 8px;
+  text-decoration: none;
+  border-radius: 8px;
+}
+.home-conversation-list a:hover {
+  background: var(--color-background-muted);
+}
+.home-conversation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  flex: none;
+}
+.home-conversation-name {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+}
+.home-conversation-list a > svg,
+.home-shortcuts > a > svg {
+  flex: none;
+  color: var(--app-muted);
+}
+.home-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 68px;
+  padding-block: 12px;
+  border-block: 1px solid var(--app-line);
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+.home-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 28px;
+}
+.home-shortcuts > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--app-muted);
+  text-decoration: none;
+}
+.home-shortcuts > a:hover {
+  background: var(--color-background-muted);
+}
+.home-shortcuts strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 0.85rem;
+  font-weight: 550;
+  margin-bottom: 6px;
+}
+.home-shortcuts span span {
+  font-size: 0.75rem;
+}
+.home-login-hint {
+  margin-top: 20px;
+  text-align: center;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+@media (max-width: 760px) {
+  .home {
+    padding: clamp(40px, 7dvh, 64px) 24px 36px;
+  }
+  .home-hero > .brand-mark {
+    width: 76px;
+    height: 76px;
+    margin-bottom: 20px;
+  }
+  .home h1 {
+    font-size: clamp(36px, 10vw, 46px);
+  }
+  .home-primary {
+    margin-top: 24px;
+  }
+  .home-conversations {
+    margin-top: 30px;
+  }
+  .home-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    margin-top: 16px;
+  }
+}

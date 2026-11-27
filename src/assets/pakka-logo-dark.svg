@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="512" height="512" role="img" aria-labelledby="title desc">
+<title id="title">Pakka — 深色模式</title>
+<desc id="desc">白色冰晶主体，保留透明十字镂空、原图提取的灰色粒子和透明背景。</desc>
+<g id="original-logo" transform="rotate(90 100 100)">
+<defs>
+    <mask id="center-cross-cutout">
+      <rect x="0" y="0" width="200" height="200" fill="#ffffff"/>
+      <line x1="78" y1="78" x2="122" y2="122" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+      <line x1="78" y1="122" x2="122" y2="78" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <path
+    d="M 25.06 35.18 Q 20 20 35.18 25.06 L 124.82 54.94 Q 140 60 145.06 75.18 L 174.94 164.82 Q 180 180 164.82 174.94 L 75.18 145.06 Q 60 140 54.94 124.82 Z"
+    fill="#ffffff"
+    mask="url(#center-cross-cutout)"
+  />
+</g>
+<g id="source-particles" transform="scale(1.5625)">
+<rect x="16" y="8" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="8" y="16" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="16" y="16" width="8" height="8" fill="rgb(204,204,204)"/>
+<rect x="24" y="16" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="16" y="24" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="56" y="8" width="8" height="8" fill="rgb(204,204,204)"/>
+<rect x="0" y="56" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="112" y="56" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="112" y="80" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="104" y="88" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="112" y="88" width="8" height="8" fill="rgb(204,204,204)"/>
+<rect x="120" y="88" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="112" y="96" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="64" y="104" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="56" y="112" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="64" y="112" width="8" height="8" fill="rgb(204,204,204)"/>
+<rect x="72" y="112" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="64" y="120" width="8" height="8" fill="rgb(217,217,217)"/>
+<rect x="96" y="120" width="8" height="8" fill="rgb(204,204,204)"/>
+</g>
+</svg>
