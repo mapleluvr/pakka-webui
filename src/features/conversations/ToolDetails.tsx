@@ -3,17 +3,10 @@ import type { PocketMessage, PocketPart } from "@pakka/protocol/pocket";
 import { TextContent, type ContentBindings } from "./TextContent.js";
 import { ImageContent } from "./ImageContent.js";
 import { useDisclosure } from "./ReadingState.js";
-import { codeEnvelope, codeSections } from "./codemode-preview.js";
+import { UiIcon } from "@pakka/webui-sdk/icons";
+import { codeSections } from "./codemode-preview.js";
 import { readableThought, type ToolContent } from "./transcript.js";
-
-const shellTool = /^(?:powershell|pwsh|bash|sh|shell|zsh|cmd)$/i;
-export function toolSource(tool: ToolContent) {
-  const key = tool.name === "codemode" ? "code" : "command";
-  if (key === "command" && !shellTool.test(tool.name)) return;
-  const text = tool.declaration?.arguments[key];
-  if (typeof text === "string" && text.trim())
-    return { key, text, title: key === "code" ? "JavaScript" : "命令" };
-}
+import { shellTool, type toolPresentation } from "./tool-presentation.js";
 
 function Fold({
   id,
@@ -31,7 +24,10 @@ function Fold({
       open={open}
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary>{title}</summary>
+      <summary>
+        <UiIcon name="chevron" className="activity-chevron" />
+        {title}
+      </summary>
       {open && <div className="tool-disclosure-body">{children}</div>}
     </details>
   );
@@ -93,7 +89,10 @@ function CodeOutput({
         sections && (
           <div className="tool-sections">
             {sections.map((s, i) => (
-              <section key={`${i}/${s.title}`}>
+              <section
+                key={`${i}/${s.title}`}
+                data-error={s.error || undefined}
+              >
                 <h5>{s.title}</h5>
                 <pre>{s.text}</pre>
               </section>
@@ -187,10 +186,10 @@ function ResultPanels({
   return (
     <>
       {parts.map(show)}
-      {result.errorMessage && (
+      {(result.errorMessage || result.errorReference) && (
         <TextContent
           panel={{ title: "错误信息" }}
-          text={result.errorMessage}
+          text={result.errorMessage ?? ""}
           reference={result.errorReference}
           {...bindings}
         />
@@ -202,10 +201,16 @@ function ResultPanels({
 export function ToolDetails({
   tool,
   identity,
+  presentation: { input: source, elapsed },
+  actions,
   ...bindings
-}: ContentBindings & { tool: ToolContent; identity: string }) {
-  const { declaration } = tool,
-    source = toolSource(tool);
+}: ContentBindings & {
+  tool: ToolContent;
+  identity: string;
+  presentation: ReturnType<typeof toolPresentation>;
+  actions?: ReactNode;
+}) {
+  const { declaration } = tool;
   const options =
     source && declaration
       ? Object.fromEntries(
@@ -225,73 +230,75 @@ export function ToolDetails({
   );
   const isCode = tool.name === "codemode";
   const parts = tool.result?.content;
-  const elapsed =
-    isCode && Array.isArray(parts)
-      ? codeEnvelope(parts, Boolean(tool.result?.isError))
-      : undefined;
   const header =
     elapsed && Array.isArray(parts)
       ? (parts[0] as Extract<PocketPart, { type: "text" }>)
       : undefined;
-  let output: ReactNode;
-  if (tool.result)
-    output = (
-      <ResultPanels
-        result={tool.result}
-        name={tool.name}
-        elapsed={elapsed}
-        {...bindings}
-      />
-    );
-  else if (tool.live?.output)
-    output = (
+  const result = tool.result && (
+    <ResultPanels
+      result={tool.result}
+      name={tool.name}
+      elapsed={elapsed}
+      {...bindings}
+    />
+  );
+  const live = tool.live;
+  const captured =
+    live && (live.output || live.contentReference) ? (
       <TextContent
-        panel={{ title: "当前输出" }}
-        text={tool.live.output}
-        reference={tool.live.contentReference}
+        panel={{ title: result ? "执行期间的输出" : "当前输出" }}
+        text={live.output ?? ""}
+        reference={live.contentReference}
         {...bindings}
       />
-    );
+    ) : null;
+  const dropped = [
+    live?.droppedBytes ? `${live.droppedBytes} 字节` : null,
+    live?.droppedLines ? `${live.droppedLines} 行` : null,
+  ].filter(Boolean);
   return (
     <div className="tool-details">
-      {isCode && source ? (
-        <Fold id={`${identity}/script`} title="脚本 · JavaScript">
+      {!isCode && args}
+      {!declaration && <p className="tool-note">调用声明不在当前页</p>}
+      {result}
+      {captured}
+      {dropped.length > 0 && (
+        <p className="tool-note">源采集已省略 {dropped.join(" / ")}</p>
+      )}
+      {isCode && args && (
+        <Fold
+          id={`${identity}/script`}
+          title={source ? "脚本 · JavaScript" : "脚本参数"}
+        >
           {args}
         </Fold>
-      ) : (
-        args
       )}
-      {isCode && output ? (
+      <footer className="tool-footer">
         <Fold
-          id={`${identity}/output`}
-          title={elapsed ? `脚本结果 · ${elapsed}` : "脚本结果"}
+          id={`${identity}/metadata`}
+          title={hasOptions ? "其他参数与调用信息" : "调用信息"}
         >
-          {output}
+          {header && (
+            <TextContent
+              panel={{ title: "运行记录" }}
+              text={header.text}
+              reference={header.contentReference}
+              {...bindings}
+            />
+          )}
+          {hasOptions && (
+            <TextContent
+              panel={{ title: "其他参数" }}
+              text={JSON.stringify(options, null, 2)}
+              {...bindings}
+            />
+          )}
+          <p className="tool-note">
+            调用 ID · <code>{tool.callId}</code>
+          </p>
         </Fold>
-      ) : (
-        output
-      )}
-      <details className="tool-metadata">
-        <summary>{hasOptions ? "其他参数与调用信息" : "调用信息"}</summary>
-        {header && (
-          <TextContent
-            panel={{ title: "运行记录" }}
-            text={header.text}
-            reference={header.contentReference}
-            {...bindings}
-          />
-        )}
-        {hasOptions && (
-          <TextContent
-            panel={{ title: "其他参数" }}
-            text={JSON.stringify(options, null, 2)}
-            {...bindings}
-          />
-        )}
-        <p>
-          <span>调用 ID</span> <code>{tool.callId}</code>
-        </p>
-      </details>
+        {actions}
+      </footer>
     </div>
   );
 }

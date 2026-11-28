@@ -7,6 +7,7 @@
 | `src/sdk/contracts.ts`                     | 通用贡献、资源引用、命令、实例与显式服务 bindings 的公共类型   |
 | `src/sdk/index.ts`                         | 插件声明与 runtime 需求检查；没有服务连接或应用启动副作用      |
 | `src/sdk/react.tsx`                        | 宿主与插件共用的 `UiContextProvider` / `useUiContext`          |
+| `src/sdk/icons.tsx`                        | 扩展与应用共用的装饰性 SVG 图标，不依赖宿主或业务服务          |
 | `src/host/lifetime.ts`                     | 单个 UI 实例的 signal、清理和过期调用拒绝                      |
 | `src/host/facet.ts`                        | 同一 WebUI publication 的实例集合、替换清理与失败保留          |
 | `src/host/registry.ts`、`InstanceView.tsx` | 贡献注册、实例渲染、命令与资源视图；由应用显式注入服务         |
@@ -50,6 +51,47 @@ export const plugin = defineUiPlugin({
 宿主在自己的 React 根下提供共享主题和 `UiContextProvider`，再以 `{ ui, bindings: undefined }` 挂载这个纯 UI view。插件不调用 `createRoot`，不重复加载 reset，也不自行复制 SDK context。`useUiContext()` 读取同一实例对象；没有 provider 时明确拒绝。
 
 有业务服务时使用 `UiPlugin<MyBindings>` 和 `UiViewProps<MyBindings>`，由装配方显式传入 client / 受权操作。UI SDK 不导入 Pakka 协议、服务客户端、Node 产品包或执行 runtime。Pakka 服务类型和 decoder 的单一源在 Pakka 仓库；它们不是另一份 UI context。
+
+## 可复用的 SVG 图标
+
+Conversation 与扩展从同一公开入口消费 `UiIcon`，`UiIconName` 是可用名称的联合类型：
+
+| 用途                                   | `name`                                                |
+| -------------------------------------- | ----------------------------------------------------- |
+| 命令、文件、编辑、代码、通用工具、思考 | `terminal`、`file`、`edit`、`code`、`tool`、`thought` |
+| 展开方向、完成、错误、停止、进行中     | `chevron`、`check`、`error`、`stop`、`spinner`        |
+| 复制、展开阅读、更多、搜索             | `copy`、`expand`、`more`、`search`                    |
+| 置顶、来源链接                         | `pin`、`link`                                         |
+
+```tsx
+import { UiIcon } from "@pakka/webui-sdk/icons";
+
+function SearchButton({ onSearch }: { onSearch(): void }) {
+  return (
+    <button
+      type="button"
+      className="search-button"
+      aria-label="搜索文件"
+      onClick={onSearch}
+    >
+      <UiIcon name="search" />
+    </button>
+  );
+}
+```
+
+```css
+.search-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+```
+
+图标默认 24×24px，使用 `currentColor`，不自带主题、动画或点击行为。它是装饰性的（`aria-hidden`、不可聚焦）：与可见文字并排时由文字表达含义，独立图标按钮则由按钮提供可访问名称、键盘焦点和至少 44×44px 命中区域。也可将 `<UiIcon />` 传给 Astryx `IconButton` 的 `icon`，由 `label` 提供名称。
+
+安装含此入口的 SDK 取得类型；使用前核对目标宿主的 `manifest.imports` 含 `@pakka/webui-sdk/icons`，并按下文规则将该子路径、React/JSX runtime 等设为 external。不要导入 Conversation 源码，也不要在扩展包内打包另一份共享运行时。
 
 ## 公共对象与操作
 
@@ -102,9 +144,9 @@ Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；B
 
 ## 静态资产与主题
 
-共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。当前两份 manifest 的 `workers` 均为空。
+共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。共享 manifest 不含 worker；应用 manifest 另声明同源通知 worker。
 
-当前开发制品要求的服务组合为 workbench 3、extensions 3、services 5；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
+当前开发制品要求的服务组合为 workbench 3、extensions 3、services 7；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
 
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 

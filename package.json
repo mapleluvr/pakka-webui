@@ -12,6 +12,10 @@
     "./react": {
       "types": "./dist/sdk/react.d.ts",
       "import": "./dist/sdk/react.js"
+    },
+    "./icons": {
+      "types": "./dist/sdk/icons.d.ts",
+      "import": "./dist/sdk/icons.js"
     }
   },
   "files": [
@@ -37,8 +41,8 @@
   "devDependencies": {
     "@astryxdesign/core": "0.7.15",
     "@astryxdesign/theme-neutral": "0.7.15",
-    "@pakka/client": "file:vendor/pakka-client-e953a39e8c1794a8.tgz",
-    "@pakka/protocol": "file:vendor/pakka-protocol-855d380de36315be.tgz",
+    "@pakka/client": "file:vendor/pakka-client-d32c00ee20abf819.tgz",
+    "@pakka/protocol": "file:vendor/pakka-protocol-6c8039ae49cffbfb.tgz",
     "@stylexjs/stylex": "0.19.2",
     "@tanstack/react-virtual": "3.13.12",
     "@types/react": "19.3.0",

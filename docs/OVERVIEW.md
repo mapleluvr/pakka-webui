@@ -4,6 +4,14 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的产品与架构见 [W
 
 ## 当前交付
 
+[Conversation 笔记与置顶](changes/conversation-notebook.md)：顶部图标打开独立笔记和原文置顶；个人模式不装配人类聊天。当前固定应用要求 services 7 / workbench 3 / extensions 3。
+
+[工具调用目录](changes/tool-call-directory.md)用命令或路径区分每次调用；展开后在同一面板查看输入和输出，codemode 默认先读结果。扩展可通过 [UI SDK](development/UI-SDK.md#可复用的-svg-图标)复用相同的 SVG 图标。
+
+[Thinking 级别选择](changes/thinking-picker.md)紧贴输入区按钮展开，列出当前模型支持的级别；`/thinking` 也打开此菜单。
+
+[本页搜索与输入回执浮窗](changes/conversation-panels.md)让两种工具独立于正文打开；桌面可拖动，手机一次显示一个贴边面板，回执状态、消息预览和原请求详情分层呈现。
+
 [悬浮输入与阅读宽度](changes/floating-composer.md)采用已确认试作：短句胶囊、多行展开、运行时原位停止、顶部操作与独立正文宽度。
 
 [主题配色预设](changes/theme-presets.md)在外观页提供四组可选颜色，覆盖页面、按钮与浮层，保留各组的明暗规则和浏览器偏好。
@@ -12,7 +20,7 @@ Pakka 的独立 WebUI 与通用 UI 插件宿主。采用的产品与架构见 [W
 
 [个人模式与设备](changes/personal-mode.md)承接同一身份多端使用、独立设备撤销、可选预算备注和协作界面简化。
 
-阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 6 / workbench 3 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
+阶段 0–5 的所选范围已完成。默认 Pakka 产品消费独立前端的固定归档，当前组合为 services 7 / workbench 3 / extensions 3、资产 schema 2。Conversation 阅读/输入/原请求恢复、工作台、设置、协作与所选业务插件均有真实路径验证；主界面经 design-companion 和实际 PC/手机操作迭代。
 
 [Session 预算](changes/session-budget.md)按项以 0 表示不限制，显示宿主的实际配置和用量。本轮交互与预算组合的候选身份、验证范围和本地证据包见[交付核对](verification/INTERFACE-REFINEMENT.md)。
 

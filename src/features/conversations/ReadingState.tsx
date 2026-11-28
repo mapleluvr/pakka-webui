@@ -88,9 +88,16 @@ function trim<T>(map: Map<string, T>) {
     map.delete(first.value);
   }
 }
-export function useDisclosure(key: string) {
+export function useDisclosure(key: string, items?: readonly { key: string }[]) {
   const memory = useContext(ReadingContext);
-  const [open, setOpen] = useState(() => memory?.open.get(key) ?? false);
+  // When a live update forms a new group around an already-open record,
+  // reveal that record; an explicit choice for the group still takes priority.
+  const [open, setOpen] = useState(
+    () =>
+      memory?.open.get(key) ??
+      items?.some((item) => memory?.open.get(item.key)) ??
+      false,
+  );
   return [
     open,
     (value: boolean) => {

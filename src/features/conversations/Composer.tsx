@@ -1,15 +1,14 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ComposerIcon } from "./ComposerIcons.js";
 import { Dictation } from "./Dictation.js";
-import { IconButton } from "@astryxdesign/core/IconButton";
-import { CloseIcon } from "../../host/InstanceView.js";
+import { ThinkingPicker } from "./ThinkingPicker.js";
 import { Button } from "@astryxdesign/core/Button";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import type { UiContext } from "@pakka/webui-sdk";
-import type { AgentRef, PocketThinkingLevel } from "@pakka/client/pocket";
+import type { AgentRef } from "@pakka/client/pocket";
 import type { ModelCatalogItem } from "@pakka/protocol/webui";
 import {
   describeFailure,
@@ -75,7 +74,7 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const commandPending = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
-  const dictationSignal = useMemo(
+  const composerSignal = useMemo(
     () => AbortSignal.any([ui.signal, connection.signal]),
     [ui.signal, connection.signal],
   );
@@ -107,16 +106,33 @@ export function Composer({
       closePicker();
     }
   }
-  async function thinking(level: string, command = false) {
-    if (!config.model?.thinkingLevels.includes(level as PocketThinkingLevel)) {
+  const setThinkingOpen = useCallback((open: boolean) => {
+    setPicker((previous) =>
+      open ? "thinking" : previous === "thinking" ? null : previous,
+    );
+  }, []);
+  function canChooseThinking() {
+    if (!configurable) {
+      setError("当前 Conversation 不能修改模型设置，请先读取配置并核对权限。");
+      return false;
+    }
+    if (!config.model?.thinkingLevels.length) {
+      setError("当前模型没有可配置的 Thinking 级别。");
+      return false;
+    }
+    return true;
+  }
+  async function thinking(value: string, command = false) {
+    if (!canChooseThinking()) return;
+    const level = config.model?.thinkingLevels.find((item) => item === value);
+    if (!level) {
       setError("当前模型不支持该 Thinking 级别。");
       return;
     }
-    if (
-      await config.configure({ thinkingLevel: level as PocketThinkingLevel })
-    ) {
-      if (command) setDraft("");
-      closePicker();
+    setError(null);
+    if (await config.configure({ thinkingLevel: level })) {
+      if (command) setDraft((current) => (current === draft ? "" : current));
+      setThinkingOpen(false);
     }
   }
   async function submit(selectedMode: InputMode = mode) {
@@ -140,13 +156,7 @@ export function Composer({
     const text = draft.trim();
     setError(null);
     if (text === "/thinking") {
-      if (!configurable) {
-        setError(
-          "当前 Conversation 不能修改模型设置，请先读取配置并核对权限。",
-        );
-        return;
-      }
-      setPicker("thinking");
+      if (canChooseThinking()) setThinkingOpen(true);
       return;
     }
     if (text.startsWith("/model ")) {
@@ -271,9 +281,6 @@ export function Composer({
     !!delivery.pending ||
     !!extensionCommand.pending;
   const modelLabel = config.configuration?.current?.model ?? "选择模型";
-  const levelLabel = config.model?.thinkingLevels.length
-    ? (config.configuration?.current?.thinkingLevel ?? "默认")
-    : "不支持";
   return (
     <section className="composer flow" aria-label="Conversation 输入">
       {settingsTarget &&
@@ -401,23 +408,25 @@ export function Composer({
             >
               {modelLabel.slice(modelLabel.indexOf("/") + 1)}
             </button>
-            <button
-              type="button"
-              className="toolbar-choice thinking-control"
-              disabled={!configurable || !config.model?.thinkingLevels.length}
-              onClick={() => setPicker("thinking")}
-              aria-label={`Thinking · ${levelLabel}`}
-              title={`Thinking · ${levelLabel}`}
-            >
-              {levelLabel}
-            </button>
+            <ThinkingPicker
+              owner={input}
+              levels={config.model?.thinkingLevels ?? []}
+              current={config.configuration?.current?.thinkingLevel}
+              disabled={!configurable}
+              open={picker === "thinking"}
+              onOpenChange={setThinkingOpen}
+              onChoose={(level) => {
+                void thinking(level, draft.trim() === "/thinking");
+              }}
+              signal={composerSignal}
+            />
           </div>
           {!running && (
             <Dictation
               compact
               key={JSON.stringify(config.currentTarget())}
               box={input}
-              signal={dictationSignal}
+              signal={composerSignal}
               enabled={
                 !busy &&
                 !config.unconfirmed &&
@@ -592,46 +601,6 @@ export function Composer({
           choose={(item) => choose(item, draft.trim() === "/model")}
           disabled={!configurable}
         />
-      )}
-      {picker === "thinking" && (
-        <Dialog
-          isOpen
-          onOpenChange={(open) => {
-            if (!open) closePicker();
-          }}
-          aria-label="选择 Thinking"
-        >
-          <div className="dialog-content flow">
-            <header className="pane-heading">
-              <h2>Thinking</h2>
-              <IconButton
-                label="关闭 Thinking 选择"
-                icon={<CloseIcon />}
-                variant="ghost"
-                onClick={closePicker}
-              />
-            </header>
-            <p>
-              当前设置：
-              {config.configuration?.current?.thinkingLevel ?? "模型默认"}
-            </p>
-            <div className="actions">
-              {config.model?.thinkingLevels.map((level) => (
-                <Button
-                  key={level}
-                  label={level}
-                  isDisabled={busy}
-                  onClick={() => {
-                    void thinking(level, draft.trim() === "/thinking");
-                  }}
-                />
-              ))}
-            </div>
-            {!config.model?.thinkingLevels.length && (
-              <p>当前模型没有可配置的 Thinking 级别。</p>
-            )}
-          </div>
-        </Dialog>
       )}
     </section>
   );

@@ -11,7 +11,8 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { createPortal } from "react-dom";
-import { CopyIcon, OriginalIcon } from "./ReadingIcons.js";
+import { UiIcon } from "@pakka/webui-sdk/icons";
+import { OriginalIcon } from "./ReadingIcons.js";
 import type { PocketContentReference } from "@pakka/protocol/pocket";
 import type { UiContext } from "@pakka/webui-sdk";
 import { OriginalContent } from "./OriginalContent.js";
@@ -66,7 +67,7 @@ function CopyButton({
         <IconButton
           label={label}
           tooltip={label}
-          icon={<CopyIcon />}
+          icon={<UiIcon name="copy" />}
           variant="ghost"
           onClick={copy}
         />
@@ -139,7 +140,7 @@ function Frame({ title, children }: { title?: string; children: ReactNode }) {
     );
   return <div className="content-body flow compact">{children}</div>;
 }
-function Preview({
+export function ContentPreview({
   text,
   format,
 }: {
@@ -227,7 +228,7 @@ export function TextContent({
             label={originalLabel}
             tooltip={originalLabel}
             aria-expanded={open}
-            icon={<OriginalIcon />}
+            icon={panel ? <UiIcon name="expand" /> : <OriginalIcon />}
             variant="ghost"
             onClick={toggleOriginal}
           />
@@ -265,14 +266,14 @@ export function TextContent({
         heading && <ContentHeading heading={heading}>{actions}</ContentHeading>
       )}
       {!(open && original) &&
-        (preview ?? <Preview text={text} format={panel ? "json" : format} />)}
+        (preview ?? (
+          <ContentPreview text={text} format={panel ? "json" : format} />
+        ))}
       {!heading && !panel && <div className="actions">{actions}</div>}
       {!open && reference && !reference.previewComplete && (
         <p className="muted">
           当前显示的是预览。
-          {original
-            ? "完整内容可分段阅读、搜索或下载。"
-            : "活动内容仍在变化，请在归档后读取完整原文。"}
+          {original ? "存档内容可分段阅读、搜索或下载。" : "当前只有活动预览。"}
         </p>
       )}
       {open && original && (

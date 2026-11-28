@@ -34,22 +34,6 @@ export function ReadingIcon({
     </svg>
   );
 }
-export function CopyIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    >
-      <rect x="8" y="4" width="12" height="14" rx="2" />
-      <path d="M16 21H6a2 2 0 0 1-2-2V9" />
-    </svg>
-  );
-}
 export function OriginalIcon() {
   return (
     <svg

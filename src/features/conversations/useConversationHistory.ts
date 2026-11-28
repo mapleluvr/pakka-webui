@@ -54,6 +54,7 @@ export function useConversationHistory(
       if (signal.aborted) return;
       clear();
       setHistory(null);
+      setResolution(null);
       setError(describeFailure(reason));
       setLoading(false);
       setObservation("stopped");
@@ -110,7 +111,9 @@ export function useConversationHistory(
         setObservation("recovering");
         if (++attempts > 3) {
           failed(
-            new Error("实时更新已断开。请点击“刷新对话记录”重新连接；发送状态待确认的消息可在发送区查询。"),
+            new Error(
+              "实时更新已断开。请点击“刷新对话记录”重新连接；发送状态待确认的消息可在发送区查询。",
+            ),
           );
           return;
         }
@@ -148,7 +151,12 @@ export function useConversationHistory(
     };
   }, [ui, connection, reference, before, revision, scope]);
   return {
-    resolution: resolution?.scope === scope ? resolution.value : null,
+    resolution:
+      resolution?.scope.ui === ui &&
+      resolution.scope.connection === connection &&
+      resolution.scope.reference === reference
+        ? resolution.value
+        : null,
     history: history?.scope === scope ? history.value : null,
     error,
     loading,

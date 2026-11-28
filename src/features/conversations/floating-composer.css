@@ -20,22 +20,12 @@
 .conversation-top-actions > div:empty {
   display: none;
 }
-.conversation-top-actions .input-activity {
-  padding: 0;
-}
-.conversation-top-actions .input-activity-bar {
-  padding: 0;
-  border: 0;
-}
 .conversation-top-actions .input-summary {
   min-height: 44px;
   min-width: 44px;
   border-radius: 12px;
   padding: 0 8px;
   gap: 6px;
-}
-.conversation-top-actions .input-summary-status {
-  display: none;
 }
 .conversation-top-actions .reading-icon {
   width: 24px;
@@ -168,6 +158,14 @@
   font-size: 10px;
   color: var(--app-muted);
 }
+.floating-composer .thinking-control[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+  background: transparent;
+}
+.thinking-level-option[aria-current="true"] {
+  background-color: var(--color-background-muted);
+}
 .composer-primary-slot {
   display: flex;
   flex: none;
@@ -228,10 +226,6 @@
 }
 .composer .dictation {
   position: relative;
-}
-.input-activity-body.dialog-content {
-  max-height: 75dvh;
-  overflow: auto;
 }
 .reading-width {
   position: relative;
@@ -428,6 +422,10 @@
     padding-inline: 12px;
   }
   .floating-composer .thinking-control {
+    min-width: 44px;
     max-width: 48px;
+  }
+  .thinking-level-option {
+    min-height: 44px;
   }
 }

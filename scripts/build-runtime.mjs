@@ -92,6 +92,7 @@ for (const [key, target] of Object.entries(
 }
 entries.set("@pakka/webui-sdk", join(root, "dist/sdk/index.js"));
 entries.set("@pakka/webui-sdk/react", join(root, "dist/sdk/react.js"));
+entries.set("@pakka/webui-sdk/icons", join(root, "dist/sdk/icons.js"));
 
 const astryx = metadata.get("@astryxdesign/core");
 const astryxRoot = join(root, "node_modules/@astryxdesign/core");

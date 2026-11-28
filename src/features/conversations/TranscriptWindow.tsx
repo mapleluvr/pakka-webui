@@ -19,14 +19,18 @@ export function TranscriptWindow({
   scroll,
   controls,
   followRevision,
+  searchQuery,
+  locateKey,
 }: {
+  locateKey?: string | null;
+  searchQuery: string | null;
   controls?: HTMLElement | null;
   followRevision: number;
   rows: readonly TranscriptRow[];
   render(row: TranscriptRow): ReactNode;
-  scroll: RefObject<HTMLDivElement | null>;
+  scroll: RefObject<HTMLElement | null>;
 }) {
-  const node = useRef<HTMLDivElement>(null);
+  const node = useRef<HTMLElement>(null);
   const [margin, setMargin] = useState(0);
   const [visible, setVisible] = useState(true);
   const [focused, setFocused] = useState<string | null>(null);
@@ -37,7 +41,7 @@ export function TranscriptWindow({
   const shown = useRef(true);
   const restore = useRef(false);
   const keys = useMemo(() => rows.map((row) => row.key), [rows]);
-  const virtual = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+  const virtual = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: rows.length,
     getScrollElement: () => scroll.current,
     getItemKey: (index) => keys[index] ?? index,
@@ -65,6 +69,13 @@ export function TranscriptWindow({
       return indexes.sort((a, b) => a - b);
     },
   });
+  useLayoutEffect(() => {
+    if (locateKey) {
+      setFollowing(false);
+      const index = keys.indexOf(locateKey);
+      if (index >= 0) virtual.scrollToIndex(index, { align: "start" });
+    }
+  }, [locateKey, virtual, keys]);
   // Growth inside the visible message keeps its current reading point. Rows
   // entirely above the viewport still compensate for their revised heights.
   virtual.shouldAdjustScrollPositionOnItemSizeChange = (
@@ -124,6 +135,9 @@ export function TranscriptWindow({
   useLayoutEffect(() => {
     if (followRevision > 0) setFollowing(true);
   }, [followRevision]);
+  useLayoutEffect(() => {
+    if (searchQuery !== null) setFollowing(false);
+  }, [searchQuery]);
   useLayoutEffect(() => {
     if (following && visible && rows.length)
       virtual.scrollToIndex(rows.length - 1, { align: "end" });
@@ -194,7 +208,7 @@ export function TranscriptWindow({
     ) : null;
   return (
     <>
-      <div
+      <section
         className="transcript-window virtual-space"
         ref={node}
         aria-label="消息历史"
@@ -219,7 +233,7 @@ export function TranscriptWindow({
             )
           );
         })}
-      </div>
+      </section>
       {controls ? createPortal(navigation, controls) : navigation}
     </>
   );

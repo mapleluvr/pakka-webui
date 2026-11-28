@@ -1,6 +1,6 @@
 import type { PocketPart } from "@pakka/protocol/pocket";
 
-type Section = { title: string; text: string };
+type Section = { title: string; text: string; error: boolean };
 
 /** Presentation of a known Pi envelope. Outcome still comes from the tool receipt. */
 export function codeEnvelope(parts: readonly PocketPart[], failed: boolean) {
@@ -32,7 +32,7 @@ export function codeSections(
     total = 0;
   function flush() {
     if (buffer.length || next || mode === "console")
-      out.push({ title, text: buffer.join("\n") });
+      out.push({ title, text: buffer.join("\n"), error: mode === "error" });
     buffer.length = 0;
   }
   let marked = false;

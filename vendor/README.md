@@ -1,5 +1,16 @@
 # 固定的公开浏览器依赖
 
+当前消费 Pakka `pakka/personal-mode`，基线 `e475795f99ce43b8a59bfbd9223f79a2750e2f5b` 加 notebook 契约，标准 build + npm pack 产物。services 7 / workbench 3 / extensions 3；资产 schema 2。
+
+| 包                                    | SHA-256                                                            |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `pakka-protocol-6c8039ae49cffbfb.tgz` | `6c8039ae49cffbfb471e4776ffc8921e410d4b9411691679577dc3fb89aeaa36` |
+| `pakka-client-d32c00ee20abf819.tgz`   | `d32c00ee20abf81923ebe396cefa5415d0ac57667c3aa175177a422f3955a662` |
+
+应用 devDependencies 和 package-lock 的 integrity 固定实际字节。UI SDK 不需要这些应用开发依赖。
+
+## 历史：Session 预算组合
+
 本应用消费 Pakka `pakka/session-budget-unlimited` 工作树（基线 `7a329040efc3fc49bb11ad6e7280e28338765924` 与该分支的 Session 预算协议更改）构建后的 `npm pack --ignore-scripts` 公开包。services 5 / workbench 3 / extensions 3；资产 schema 2。旧的正数 decoder 不可读取 0 额度，新旧前后端不能混配。
 
 | 归档                                  | 版本  | SHA-256                                                            |
