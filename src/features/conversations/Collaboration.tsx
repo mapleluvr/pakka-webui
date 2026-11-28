@@ -22,24 +22,18 @@ import {
   hasCollaborationPending,
   useCollaboration,
 } from "./useCollaboration.js";
+
 import "./collaboration.css";
 
-interface NoteDraft {
-  baseVersion: number;
-  baseText: string | null;
-  text: string;
-}
 interface Drafts {
   text: string;
   quoteId: string | null;
   mentions: string[];
-  note: NoteDraft | null;
 }
 const emptyDrafts = (): Drafts => ({
   text: "",
   quoteId: null,
   mentions: [],
-  note: null,
 });
 const labels = {
   post: "聊天",
@@ -121,13 +115,6 @@ export function Collaboration({
   const pending = hasCollaborationPending(connection, target);
   function close() {
     setOpen(false);
-    setDrafts((previous) => ({
-      ...previous,
-      note:
-        previous.note && previous.note.text !== previous.note.baseText
-          ? previous.note
-          : null,
-    }));
     entry.current?.focus();
   }
   return (
@@ -135,7 +122,7 @@ export function Collaboration({
       <div className="actions">
         <Button
           ref={entry}
-          label="人类协作"
+          label="人类聊天"
           variant="ghost"
           aria-expanded={open}
           onClick={() => {
@@ -181,22 +168,15 @@ function CollaborationPanel({
   const [inputError, setInputError] = useState<string | null>(null);
   const panel = useRef<HTMLElement>(null);
   const chatInput = useRef<HTMLTextAreaElement>(null);
-  const note = shared.view?.snapshot.note;
   const messages = shared.view?.snapshot.messages ?? [];
   const driver = shared.view?.snapshot.driver;
   const postScope = collaborationScope({ kind: "post", text: "" });
-  const noteScope = collaborationScope({
-    kind: "note",
-    expectedVersion: 0,
-    text: "",
-  });
   const driverScope = collaborationScope({
     kind: "driver",
     action: "claim",
     expectedVersion: 0,
   });
   const postPending = shared.pending.get(postScope);
-  const notePending = shared.pending.get(noteScope);
   const names = new Map([[connection.person.id, connection.person.name]]);
   for (const person of shared.view?.snapshot.presence ?? [])
     names.set(person.personId, person.name);
@@ -229,39 +209,9 @@ function CollaborationPanel({
           mentions: [...(action.mentions ?? [])],
         };
       }
-      if (
-        notePending &&
-        notePending !== "unreadable" &&
-        notePending.action.kind === "note" &&
-        !previous.note
-      ) {
-        const action = notePending.action;
-        next = {
-          ...next,
-          note: {
-            baseVersion: action.expectedVersion,
-            baseText: null,
-            text: action.text,
-          },
-        };
-      } else if (
-        note &&
-        !notePending &&
-        (!previous.note || previous.note.text === previous.note.baseText) &&
-        previous.note?.baseVersion !== note.version
-      ) {
-        next = {
-          ...next,
-          note: {
-            baseVersion: note.version,
-            baseText: note.text,
-            text: note.text,
-          },
-        };
-      }
       return next;
     });
-  }, [note, postPending, notePending, setDrafts]);
+  }, [postPending, setDrafts]);
   function confirmed(receipt: CollaborationReceipt | null) {
     if (
       !receipt ||
@@ -280,12 +230,6 @@ function CollaborationPanel({
           JSON.stringify([...(action.mentions ?? [])].sort())
       )
         return { ...previous, text: "", quoteId: null, mentions: [] };
-      if (
-        action.kind === "note" &&
-        previous.note?.text === action.text &&
-        previous.note.baseVersion === action.expectedVersion
-      )
-        return { ...previous, note: null };
       return previous;
     });
   }
@@ -326,14 +270,12 @@ function CollaborationPanel({
       ref={panel}
       tabIndex={-1}
       className="surface flow collaboration-panel"
-      aria-label="人类协作"
+      aria-label="人类聊天"
     >
       <header className="feature-heading">
         <div className="flow compact">
-          <h2>人类协作</h2>
-          <p className="muted">
-            聊天与笔记供人类共享；模型输入使用下方 Conversation 输入框。
-          </p>
+          <h2>人类聊天</h2>
+          <p className="muted">模型输入使用下方 Conversation 输入框。</p>
         </div>
         <Button label="关闭协作" variant="ghost" onClick={close} />
       </header>
@@ -617,6 +559,7 @@ function CollaborationPanel({
                       );
                     })}
                   </div>
+
                   <div className="actions">
                     <Button
                       label="引用消息"
@@ -630,6 +573,7 @@ function CollaborationPanel({
                         chatInput.current?.focus();
                       }}
                     />
+
                     {shared.view?.canPin && (
                       <Button
                         label={message.pinned ? "取消置顶" : "置顶消息"}
@@ -771,105 +715,6 @@ function CollaborationPanel({
               </p>
             )}
           </form>
-        </section>
-        <section className="flow" aria-label="共享笔记">
-          <h3>共享笔记{note ? ` · 当前版本 ${note.version}` : ""}</h3>
-          {shared.view?.canEditNote ? (
-            <form
-              className="flow compact"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (drafts.note)
-                  void shared
-                    .act({
-                      kind: "note",
-                      expectedVersion: drafts.note.baseVersion,
-                      text: drafts.note.text,
-                    })
-                    .then(confirmed);
-              }}
-            >
-              {drafts.note &&
-                note &&
-                drafts.note.baseVersion !== note.version && (
-                  <div role="status" className="flow compact">
-                    <p>
-                      {"共享笔记已更新，当前草稿仍保留原版本 "}
-                      {drafts.note.baseVersion}。
-                    </p>
-                    <Button
-                      label="按当前版本继续编辑"
-                      variant="ghost"
-                      isDisabled={!!notePending}
-                      onClick={() =>
-                        setDrafts((previous) => ({
-                          ...previous,
-                          note: previous.note
-                            ? {
-                                ...previous.note,
-                                baseVersion: note.version,
-                                baseText: note.text,
-                              }
-                            : null,
-                        }))
-                      }
-                    />
-                    <Button
-                      label="读取当前笔记内容"
-                      variant="ghost"
-                      isDisabled={!!notePending}
-                      onClick={() =>
-                        setDrafts((previous) => ({
-                          ...previous,
-                          note: {
-                            baseVersion: note.version,
-                            baseText: note.text,
-                            text: note.text,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                )}
-              <TextArea
-                label="编辑共享笔记"
-                value={drafts.note?.text ?? ""}
-                rows={7}
-                autoComplete="off"
-                controlClassName="composer-input"
-                onChange={(text) =>
-                  setDrafts((previous) => ({
-                    ...previous,
-                    note: previous.note
-                      ? { ...previous.note, text }
-                      : {
-                          baseVersion: note?.version ?? 0,
-                          baseText: note?.text ?? "",
-                          text,
-                        },
-                  }))
-                }
-              />
-              <Button
-                label="保存共享笔记"
-                type="submit"
-                isLoading={shared.busyScopes.has(noteScope)}
-                isDisabled={
-                  !shared.view ||
-                  !!shared.storageError ||
-                  !!notePending ||
-                  !drafts.note ||
-                  drafts.note.text === drafts.note.baseText
-                }
-              />
-            </form>
-          ) : note ? (
-            <p className="collaboration-text">
-              {note.text || "暂无共享笔记。"}
-            </p>
-          ) : (
-            <p className="muted">读取协作后显示当前笔记。</p>
-          )}
         </section>
       </div>
     </section>

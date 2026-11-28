@@ -1,16 +1,36 @@
-export function CopyIcon() {
+/** Decorative line icons for labelled reading controls. */
+export function ReadingIcon({
+  name,
+}: {
+  name: "chevron" | "refresh" | "latest" | "pause" | "processing";
+}) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      className="reading-icon"
+      data-icon={name}
       aria-hidden="true"
-      width="20"
-      height="20"
+      focusable="false"
+      width="16"
+      height="16"
+      viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <rect x="8" y="4" width="12" height="14" rx="2" />
-      <path d="M16 21H6a2 2 0 0 1-2-2V9" />
+      {name === "chevron" && <path d="m7 5 5 5-5 5" />}
+      {name === "refresh" && (
+        <path d="M16.2 9a6.3 6.3 0 1 0-1.2 4.9M16.3 3.8v5.3H11" />
+      )}
+      {name === "latest" && <path d="M10 3v10m-4-4 4 4 4-4M4 16.5h12" />}
+      {name === "pause" && <path d="M7 4.5v11m6-11v11" />}
+      {name === "processing" && (
+        <>
+          <circle cx="10" cy="10" r="6.5" opacity=".24" />
+          <path d="M10 3.5a6.5 6.5 0 0 1 6.5 6.5" />
+        </>
+      )}
     </svg>
   );
 }

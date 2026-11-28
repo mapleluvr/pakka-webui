@@ -11,7 +11,6 @@ import { Dialog } from "@astryxdesign/core/Dialog";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Button } from "@astryxdesign/core/Button";
 import { InstanceView, CloseIcon } from "../host/InstanceView.js";
-import { viewHref } from "../host/links.js";
 import type { UiRegistry } from "../host/registry.js";
 import {
   useIdentityControls,
@@ -19,8 +18,16 @@ import {
 } from "../features/identity/IdentityControls.js";
 import type { usePakkaConnection } from "../features/identity/usePakkaConnection.js";
 import { useViewNavigation } from "./useViewNavigation.js";
-import { useAppearance } from "../features/settings/appearance.js";
+import {
+  appearanceMode,
+  useAppearance,
+} from "../features/settings/appearance.js";
+import "./palettes.css";
+import { NoticeViewport } from "./NoticeViewport.js";
 import { WorkspaceNavigation } from "./WorkspaceNavigation.js";
+import { DeskDivider } from "../ui/DeskDivider.js";
+import { BrandMark } from "../ui/BrandMark.js";
+import { HomeView } from "./HomeView.js";
 import "./workspace.css";
 
 function MenuIcon() {
@@ -52,6 +59,7 @@ export function Application({
   prepareView(target: ViewTarget): Promise<void>;
 }) {
   const { preferences } = useAppearance();
+  const themeMode = appearanceMode(preferences);
   const state = useSyncExternalStore(registry.subscribe, registry.getSnapshot);
   const navigation = useViewNavigation(registry, state, prepareView);
   const [navOpen, setNavOpen] = useState(false);
@@ -62,6 +70,18 @@ export function Application({
     document.title = current ? `${current.title} · Pakka` : "Pakka";
   }, [navigation.active, state.instances]);
   useEffect(() => setNavOpen(false), [navigation.active]);
+  useEffect(() => {
+    for (const icon of document.querySelectorAll<HTMLLinkElement>(
+      "link[data-brand-icon]",
+    )) {
+      const mode = icon.dataset.brandIcon;
+      if (themeMode === "system") {
+        icon.media = `(prefers-color-scheme: ${mode})`;
+      } else {
+        icon.media = themeMode === mode ? "all" : "not all";
+      }
+    }
+  }, [themeMode]);
   function linkClick(event: MouseEvent<HTMLAnchorElement>) {
     navigation.linkClick(event);
     if (
@@ -98,7 +118,7 @@ export function Application({
     initialCredential,
   });
   return (
-    <Theme theme={neutralTheme} mode={preferences.mode}>
+    <Theme theme={neutralTheme} mode={themeMode}>
       <a className="skip-link" href="#main">
         跳到内容
       </a>
@@ -111,14 +131,30 @@ export function Application({
             variant="ghost"
             onClick={() => setNavOpen(true)}
           />
-          <a className="brand" href="#/" onClick={linkClick}>
-            Pakka
+          <a
+            className="brand"
+            href="#/"
+            onClick={linkClick}
+            aria-label="Pakka 首页"
+          >
+            <BrandMark />
+            <span>Pakka</span>
           </a>
-          <span className="brand-caption">Workspace</span>
         </header>
-        <aside className="sidebar" aria-label="工作区导航">
-          <a className="brand" href="#/" onClick={linkClick}>
-            Pakka<span className="brand-caption">Workspace</span>
+        <aside
+          id="workspace-sidebar"
+          className="sidebar"
+          aria-label="工作区导航"
+        >
+          <DeskDivider kind="sidebar" controls="workspace-sidebar" />
+          <a
+            className="brand"
+            href="#/"
+            onClick={linkClick}
+            aria-label="Pakka 首页"
+          >
+            <BrandMark />
+            <span>Pakka</span>
           </a>
           {pages}
           {identity.connection && (
@@ -132,40 +168,14 @@ export function Application({
         </aside>
         <main id="main" className="main" tabIndex={-1}>
           {!navigation.active && (
-            <section className="welcome flow">
-              <p className="eyebrow">Pakka Workspace</p>
-              <h1>打开你的工作空间</h1>
-              {navigation.unavailable ? (
-                <p role="status">{navigation.unavailable}</p>
-              ) : (
-                <p className="muted">
-                  {identity.connection
-                    ? "选择一个 Conversation，继续工作或浏览原历史。"
-                    : "连接 Pakka 后进入 Conversations 和设置。组件实验室可独立使用。"}
-                </p>
-              )}
-              <div className="actions">
-                {identity.connection && (
-                  <a
-                    className="text-link"
-                    href={viewHref({
-                      plugin: "conversations",
-                      view: "workspace",
-                    })}
-                    onClick={linkClick}
-                  >
-                    浏览 Conversations
-                  </a>
-                )}
-                <a
-                  className="text-link"
-                  href={viewHref({ plugin: "playground", view: "home" })}
-                  onClick={linkClick}
-                >
-                  进入组件实验室
-                </a>
-              </div>
-            </section>
+            <HomeView
+              connection={identity.connection}
+              busy={identity.busy}
+              unavailable={navigation.unavailable}
+              navigation={state.navigation}
+              linkClick={linkClick}
+              openLogin={identityControls.openLogin}
+            />
           )}
           {state.instances.map((view) => (
             <InstanceView
@@ -176,20 +186,11 @@ export function Application({
             />
           ))}
         </main>
-        <section className="notices" aria-label="提示" aria-live="polite">
-          {state.notices.map((item) => (
-            <div key={item.id} className={`notice notice-${item.tone}`}>
-              <p>{item.message}</p>
-              <IconButton
-                className="icon-button"
-                label="关闭提示"
-                icon={<CloseIcon />}
-                variant="ghost"
-                onClick={() => registry.dismiss(item.id)}
-              />
-            </div>
-          ))}
-        </section>
+        <NoticeViewport
+          registry={registry}
+          notices={state.notices}
+          announcement={state.announcement}
+        />
       </div>
       <Dialog
         isOpen={navOpen}
@@ -200,7 +201,15 @@ export function Application({
       >
         <div className="navigation-sheet">
           <header className="pane-heading">
-            <strong>Pakka</strong>
+            <a
+              className="brand"
+              href="#/"
+              onClick={linkClick}
+              aria-label="Pakka 首页"
+            >
+              <BrandMark />
+              <span>Pakka</span>
+            </a>
             <IconButton
               className="icon-button"
               label="关闭工作区导航"

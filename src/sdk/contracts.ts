@@ -47,6 +47,8 @@ export type ResourceResolution =
     };
 
 export interface UiNotice {
+  /** Distinguishes otherwise identical feedback for different actions or targets in this instance. */
+  readonly key?: string;
   readonly tone: "info" | "success" | "warning" | "error";
   readonly message: string;
 }

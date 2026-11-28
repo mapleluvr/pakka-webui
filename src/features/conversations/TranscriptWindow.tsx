@@ -8,7 +8,7 @@ import {
 } from "react";
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import type { TranscriptRow } from "./transcript.js";
-import { Button } from "@astryxdesign/core/Button";
+import { ReadingIcon } from "./ReadingIcons.js";
 import { createPortal } from "react-dom";
 
 type Anchor = { key: string; offset: number };
@@ -19,14 +19,18 @@ export function TranscriptWindow({
   scroll,
   controls,
   followRevision,
+  searchQuery,
+  locateKey,
 }: {
+  locateKey?: string | null;
+  searchQuery: string | null;
   controls?: HTMLElement | null;
   followRevision: number;
   rows: readonly TranscriptRow[];
   render(row: TranscriptRow): ReactNode;
-  scroll: RefObject<HTMLDivElement | null>;
+  scroll: RefObject<HTMLElement | null>;
 }) {
-  const node = useRef<HTMLDivElement>(null);
+  const node = useRef<HTMLElement>(null);
   const [margin, setMargin] = useState(0);
   const [visible, setVisible] = useState(true);
   const [focused, setFocused] = useState<string | null>(null);
@@ -37,7 +41,7 @@ export function TranscriptWindow({
   const shown = useRef(true);
   const restore = useRef(false);
   const keys = useMemo(() => rows.map((row) => row.key), [rows]);
-  const virtual = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+  const virtual = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: rows.length,
     getScrollElement: () => scroll.current,
     getItemKey: (index) => keys[index] ?? index,
@@ -65,6 +69,13 @@ export function TranscriptWindow({
       return indexes.sort((a, b) => a - b);
     },
   });
+  useLayoutEffect(() => {
+    if (locateKey) {
+      setFollowing(false);
+      const index = keys.indexOf(locateKey);
+      if (index >= 0) virtual.scrollToIndex(index, { align: "start" });
+    }
+  }, [locateKey, virtual, keys]);
   // Growth inside the visible message keeps its current reading point. Rows
   // entirely above the viewport still compensate for their revised heights.
   virtual.shouldAdjustScrollPositionOnItemSizeChange = (
@@ -125,6 +136,9 @@ export function TranscriptWindow({
     if (followRevision > 0) setFollowing(true);
   }, [followRevision]);
   useLayoutEffect(() => {
+    if (searchQuery !== null) setFollowing(false);
+  }, [searchQuery]);
+  useLayoutEffect(() => {
     if (following && visible && rows.length)
       virtual.scrollToIndex(rows.length - 1, { align: "end" });
   }, [following, visible, rows, total, viewportHeight, margin, virtual]);
@@ -182,16 +196,19 @@ export function TranscriptWindow({
   const navigation =
     rows.length > 0 ? (
       <div className="transcript-tail-controls">
-        <Button
-          label={following ? "暂停跟随" : "到本页最新消息"}
-          variant="ghost"
+        <button
+          className="reader-action"
+          type="button"
           onClick={() => setFollowing((value) => !value)}
-        />
+        >
+          <ReadingIcon name={following ? "pause" : "latest"} />
+          {following ? "暂停跟随" : "到本页最新消息"}
+        </button>
       </div>
     ) : null;
   return (
     <>
-      <div
+      <section
         className="transcript-window virtual-space"
         ref={node}
         aria-label="消息历史"
@@ -216,7 +233,7 @@ export function TranscriptWindow({
             )
           );
         })}
-      </div>
+      </section>
       {controls ? createPortal(navigation, controls) : navigation}
     </>
   );

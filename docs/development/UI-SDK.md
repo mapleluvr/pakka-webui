@@ -7,6 +7,7 @@
 | `src/sdk/contracts.ts`                     | 通用贡献、资源引用、命令、实例与显式服务 bindings 的公共类型   |
 | `src/sdk/index.ts`                         | 插件声明与 runtime 需求检查；没有服务连接或应用启动副作用      |
 | `src/sdk/react.tsx`                        | 宿主与插件共用的 `UiContextProvider` / `useUiContext`          |
+| `src/sdk/icons.tsx`                        | 扩展与应用共用的装饰性 SVG 图标，不依赖宿主或业务服务          |
 | `src/host/lifetime.ts`                     | 单个 UI 实例的 signal、清理和过期调用拒绝                      |
 | `src/host/facet.ts`                        | 同一 WebUI publication 的实例集合、替换清理与失败保留          |
 | `src/host/registry.ts`、`InstanceView.tsx` | 贡献注册、实例渲染、命令与资源视图；由应用显式注入服务         |
@@ -51,6 +52,47 @@ export const plugin = defineUiPlugin({
 
 有业务服务时使用 `UiPlugin<MyBindings>` 和 `UiViewProps<MyBindings>`，由装配方显式传入 client / 受权操作。UI SDK 不导入 Pakka 协议、服务客户端、Node 产品包或执行 runtime。Pakka 服务类型和 decoder 的单一源在 Pakka 仓库；它们不是另一份 UI context。
 
+## 可复用的 SVG 图标
+
+Conversation 与扩展从同一公开入口消费 `UiIcon`，`UiIconName` 是可用名称的联合类型：
+
+| 用途                                   | `name`                                                |
+| -------------------------------------- | ----------------------------------------------------- |
+| 命令、文件、编辑、代码、通用工具、思考 | `terminal`、`file`、`edit`、`code`、`tool`、`thought` |
+| 展开方向、完成、错误、停止、进行中     | `chevron`、`check`、`error`、`stop`、`spinner`        |
+| 复制、展开阅读、更多、搜索             | `copy`、`expand`、`more`、`search`                    |
+| 置顶、来源链接                         | `pin`、`link`                                         |
+
+```tsx
+import { UiIcon } from "@pakka/webui-sdk/icons";
+
+function SearchButton({ onSearch }: { onSearch(): void }) {
+  return (
+    <button
+      type="button"
+      className="search-button"
+      aria-label="搜索文件"
+      onClick={onSearch}
+    >
+      <UiIcon name="search" />
+    </button>
+  );
+}
+```
+
+```css
+.search-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+```
+
+图标默认 24×24px，使用 `currentColor`，不自带主题、动画或点击行为。它是装饰性的（`aria-hidden`、不可聚焦）：与可见文字并排时由文字表达含义，独立图标按钮则由按钮提供可访问名称、键盘焦点和至少 44×44px 命中区域。也可将 `<UiIcon />` 传给 Astryx `IconButton` 的 `icon`，由 `label` 提供名称。
+
+安装含此入口的 SDK 取得类型；使用前核对目标宿主的 `manifest.imports` 含 `@pakka/webui-sdk/icons`，并按下文规则将该子路径、React/JSX runtime 等设为 external。不要导入 Conversation 源码，也不要在扩展包内打包另一份共享运行时。
+
 ## 公共对象与操作
 
 | 对象                    | 含义                                                                                 |
@@ -63,6 +105,8 @@ export const plugin = defineUiPlugin({
 | `UiViewProps<Bindings>` | 实例 ui、装配方提供的 bindings 与可选界面 input                                      |
 
 `UiContext` 提供 `notice`、`open`、`navigate`、`dispatch`、`close` 和 `onDispose`。资源解析结果区分 ready、unloaded、unavailable、forbidden、identity-mismatch、unsupported；宿主不从 opaque id 猜测数据库路径或 Pakka URL。Pakka 接入层将自己的 typed Session/Conversation 引用交给公开服务，再适配到 UI 来源。
+
+`ui.notice({ tone, message, key? })` 用于一次用户动作的简短反馈，不替代持久回执、查询或系统推送。不要在提示中包含凭据、消息正文或技术请求号。原 API 1 调用仍可只传 `tone` 和 `message`；同一实例内相同语气和文案会折叠。如果文案相同但动作或目标不同，用不渲染的 `key` 区分。不要在渲染、订阅快照或回执历史读取时重发提示。
 
 应用 registry 实现命名空间命令；Conversation 输入的模型/Thinking 与 extension slash 解析属于各功能及 Pakka 接入层。界面命令通过 registry 打开所属实例；Backend action 按公开 schema 校验 JSON 参数，使用其 generation、effect 与 App/Conversation 作用域。普通路径及未注册 slash 文本按原消息发送，发现失败保留疑似命令参数，未启用或歧义的已声明命令明确拒绝。
 
@@ -100,9 +144,9 @@ Pakka 接入层核对服务提供的 WebUI publication 后驱动这项清理；B
 
 ## 静态资产与主题
 
-共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。当前两份 manifest 的 `workers` 均为空。
+共享 runtime 构建生成 `asset-manifest.json`：包括服务需求、runtime/SDK 组合、imports、styles、精确 `inlineStyleHashes`、workers 和每个文件的 URL/内容 hash。URL 带共同的内容身份，内部 chunk 使用相对引用。共享 runtime 的 `entry` 是 `null`；应用构建将 HTML entry、应用 JS/CSS 与这张共享图组合为 `dist/app`。共享 manifest 不含 worker；应用 manifest 另声明同源通知 worker。
 
-当前开发制品要求的服务组合为 workbench 2、extensions 3、services 3；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
+当前开发制品要求的服务组合为 workbench 3、extensions 3、services 7；它与 UI SDK/renderer 兼容范围分别检查。具体服务协议由 Pakka 的公开 protocol/client 包维护。
 
 默认 CSS 顺序为 Core reset、Core 组件样式、Neutral theme。使用上游 `@astryxdesign/theme-neutral/built`，其静态 CSS 不触发 Theme 的 inline 注入；字体采用上游支持的系统 fallback。可选远程 fonts.css 不自动交付或加载，字体资源按实际用途纳入获准的同源资产。
 

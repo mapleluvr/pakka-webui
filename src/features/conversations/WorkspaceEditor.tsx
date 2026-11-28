@@ -13,6 +13,7 @@ import type { PocketClientResult } from "@pakka/client/pocket";
 import type { PocketNavigation } from "@pakka/protocol/pocket";
 import type { PakkaConnection } from "../../integrations/pakka/connection.js";
 import type { useWorkspaceChange } from "../../integrations/pakka/useWorkspaceChange.js";
+import { workspaceFeedback } from "./workspace-feedback.js";
 import { DirectoryField } from "../../ui/DirectoryField.js";
 export type Editor =
   | { kind: "session"; name: string; cwd: string }
@@ -97,9 +98,11 @@ export function WorkspaceEditor({
                     {change.error ?? error}
                   </p>
                 )}
-                {change.pending && (
+                {!change.busy && change.pending && (
                   <p>
-                    原请求已保留。关闭编辑窗口后可在工作台核对；当前不能重复保存。
+                    {change.pending === "unreadable"
+                      ? "本地保存记录不可读，请保留记录，不要重复保存。"
+                      : `还不能确认是否${workspaceFeedback(change.pending).confirmed}。关闭编辑窗口后，可在工作台${workspaceFeedback(change.pending).lookup}。`}
                   </p>
                 )}
                 {editor.kind === "folder-delete" ? (

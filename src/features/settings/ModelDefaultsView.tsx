@@ -1,79 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Selector } from "@astryxdesign/core/Selector";
-import { PocketRemoteError } from "@pakka/client/pocket";
 import type { PocketThinkingLevel } from "@pakka/protocol/pocket";
+import type { ModelCatalogItem } from "@pakka/protocol/webui";
 import {
-  decodeModelDefaultsChange,
-  type ModelCatalogItem,
-  type ModelDefaults,
-  type ModelDefaultsChange,
-  type ModelIdentity,
-} from "@pakka/protocol/webui";
+  sameModel,
+  usePersonalModelDefaults,
+  type DefaultSelection,
+} from "./usePersonalModelDefaults.js";
 import type { UiViewProps } from "@pakka/webui-sdk";
 import {
   describeFailure,
   requestSignal,
   type PakkaConnection,
 } from "../../integrations/pakka/connection.js";
-import {
-  readPending,
-  claimPending,
-  clearPending,
-} from "../../integrations/pakka/pending.js";
-import {
-  ModelPicker,
-  modelKey,
-  exactModel,
-} from "../conversations/ModelPicker.js";
+import { ModelPicker } from "../conversations/ModelPicker.js";
+import { modelKey, exactModel } from "../conversations/modelCatalog.js";
 
 export function ModelDefaultsView({
   ui,
   bindings: connection,
 }: UiViewProps<PakkaConnection>) {
-  const key = JSON.stringify([
-    location.origin,
-    connection.person.id,
-    "model-defaults",
-  ]);
-  const restore = () => readPending(key, decodeModelDefaultsChange);
-  const [pending, setPending] = useState(restore);
-  const [defaults, setDefaults] = useState<ModelDefaults | null>(null);
-  const [model, setModel] = useState<ModelIdentity | null>(null);
-  const [levels, setLevels] = useState<readonly PocketThinkingLevel[]>([]);
-  const [thinking, setThinking] = useState<PocketThinkingLevel | null>(null);
-  const [picker, setPicker] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const admission = useRef(false);
-  const alive = () => !ui.signal.aborted && !connection.signal.aborted;
-  const signal = () => requestSignal(ui.signal, connection);
-  function apply(value: ModelDefaults) {
-    if (alive()) {
-      setDefaults(value);
-      setModel(value.model);
-      setThinking(value.thinkingLevel);
-    }
-  }
-  async function read(readSignal = signal()) {
-    const result = await connection.services.request(
-      { op: "model-defaults.read" },
-      { signal: readSignal },
-    );
-    if (!readSignal.aborted) apply(result.defaults);
-  }
+  const [draft, setDraft] = useState<DefaultSelection | null>(null),
+    [catalogError, setCatalogError] = useState("");
+  const personal = usePersonalModelDefaults(ui, connection, draft === null);
+  const { defaults, busy, pending, message } = personal;
+  const model = (draft ?? defaults)?.model ?? null,
+    thinking = (draft ?? defaults)?.thinkingLevel ?? null;
+  const [levels, setLevels] = useState<readonly PocketThinkingLevel[]>([]),
+    [picker, setPicker] = useState(false);
+  const dirty =
+    !!defaults &&
+    (!sameModel(model, defaults.model) || thinking !== defaults.thinkingLevel);
+  const error = personal.error || catalogError;
   useEffect(() => {
-    const controller = new AbortController();
-    void read(AbortSignal.any([signal(), controller.signal])).catch(
-      (reason) => {
-        if (!controller.signal.aborted && alive())
-          setError(describeFailure(reason));
-      },
-    );
-    return () => controller.abort();
-  }, [ui, connection]);
-  useEffect(() => {
+    setCatalogError("");
     if (!model) {
       setLevels([]);
       return;
@@ -83,101 +44,35 @@ export function ModelDefaultsView({
     void exactModel(
       connection,
       modelKey(model),
-      AbortSignal.any([signal(), controller.signal]),
+      AbortSignal.any([
+        requestSignal(ui.signal, connection),
+        controller.signal,
+      ]),
     )
       .then((item) => {
-        if (!controller.signal.aborted && alive())
+        if (
+          !controller.signal.aborted &&
+          !ui.signal.aborted &&
+          !connection.signal.aborted
+        )
           setLevels(item.thinkingLevels);
       })
       .catch((reason) => {
-        if (!controller.signal.aborted && alive())
-          setError(describeFailure(reason));
+        if (
+          !controller.signal.aborted &&
+          !ui.signal.aborted &&
+          !connection.signal.aborted
+        )
+          setCatalogError(describeFailure(reason));
       });
     return () => controller.abort();
   }, [model, ui, connection]);
-  function release(requestId: string) {
-    const remaining = clearPending(key, requestId, decodeModelDefaultsChange);
-    if (alive()) setPending(remaining);
-  }
-  async function save() {
-    if (!defaults || admission.current || !alive()) return;
-    const existing = restore();
-    if (existing) {
-      setPending(existing);
-      return;
-    }
-    admission.current = true;
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    let sent: ModelDefaultsChange | null = null;
-    try {
-      const change = decodeModelDefaultsChange({
-        requestId: crypto.randomUUID(),
-        expectedVersion: defaults.version,
-        model,
-        thinkingLevel: thinking,
-      });
-      const reserved = claimPending(key, change, decodeModelDefaultsChange);
-      if (alive()) setPending(reserved);
-      if (reserved === "unreadable" || reserved.requestId !== change.requestId)
-        return;
-      sent = change;
-      const result = await connection.services.request(
-        { op: "model-defaults.write", change },
-        { signal: signal() },
-      );
-      release(change.requestId);
-      apply(result.receipt.defaults);
-      if (alive()) setMessage("个人默认已保存。已有 Conversation 保持原设置。");
-    } catch (reason) {
-      if (
-        sent &&
-        reason instanceof PocketRemoteError &&
-        reason.outcome === "denied"
-      ) {
-        try {
-          release(sent.requestId);
-        } catch {
-          /* Keep pending if storage is unavailable. */
-        }
-      }
-      if (alive()) setError(describeFailure(reason));
-    } finally {
-      admission.current = false;
-      if (alive()) setBusy(false);
-    }
-  }
-  async function lookup() {
-    if (admission.current || !alive()) return;
-    const original = restore();
-    setPending(original);
-    if (!original || original === "unreadable") return;
-    admission.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await connection.services.request(
-        { op: "model-defaults.lookup", original },
-        { signal: signal() },
-      );
-      if (result.receipt) {
-        release(original.requestId);
-        apply(result.receipt.defaults);
-        if (alive()) setMessage("已核对原请求，个人默认保存成功。");
-      } else if (alive())
-        setMessage("尚未找到原请求的回执，结果仍未知；未重新提交。");
-    } catch (reason) {
-      if (alive()) setError(describeFailure(reason));
-    } finally {
-      admission.current = false;
-      if (alive()) setBusy(false);
-    }
-  }
   const choose = (item: ModelCatalogItem) => {
-    setModel({ provider: item.provider, id: item.id });
-    setLevels(item.thinkingLevels);
-    if (thinking && !item.thinkingLevels.includes(thinking)) setThinking(null);
+    setDraft({
+      model: { provider: item.provider, id: item.id },
+      thinkingLevel:
+        thinking && item.thinkingLevels.includes(thinking) ? thinking : null,
+    });
     setPicker(false);
   };
   return (
@@ -185,23 +80,22 @@ export function ModelDefaultsView({
       <header className="feature-heading">
         <div className="flow compact">
           <p className="eyebrow">Settings</p>
-          <h1>个人模型默认</h1>
+          <h1>新对话默认模型</h1>
         </div>
         <Button
-          label="重新读取默认"
+          label="刷新默认设置"
           variant="ghost"
           isDisabled={busy}
           onClick={() => {
-            setError(null);
-            void read().catch((reason) => {
-              if (alive()) setError(describeFailure(reason));
+            void personal.read().then((ok) => {
+              if (ok) setDraft(null);
             });
           }}
         />
       </header>
       <p className="muted">
-        按 Person 在后端保存并跨设备使用；仅为本人新建且未指定配置的
-        Conversation 提供默认值。
+        你在各台设备新建对话时使用这组默认设置。已有对话保留各自的模型与
+        Thinking。
       </p>
       {error && (
         <p role="alert" className="error-text">
@@ -217,17 +111,19 @@ export function ModelDefaultsView({
               : `原请求 ${pending.requestId} 尚未确认。`}
           </p>
           <Button
-            label="核对原默认请求"
+            label="查看保存结果"
             isDisabled={busy || pending === "unreadable"}
             onClick={() => {
-              void lookup();
+              void personal.lookup().then((ok) => {
+                if (ok) setDraft(null);
+              });
             }}
           />
         </div>
       )}
       {defaults && (
         <div className="surface flow">
-          <h2>启动选择</h2>
+          <h2>模型与 Thinking</h2>
           <div className="actions">
             <Button
               label={model ? `默认模型 · ${modelKey(model)}` : "选择默认模型"}
@@ -235,12 +131,11 @@ export function ModelDefaultsView({
               onClick={() => setPicker(true)}
             />
             <Button
-              label="使用实例缺省模型"
+              label="恢复跟随实例"
               variant="ghost"
-              isDisabled={busy || !!pending}
+              isDisabled={busy || !!pending || (!model && !thinking)}
               onClick={() => {
-                setModel(null);
-                setThinking(null);
+                setDraft({ model: null, thinkingLevel: null });
               }}
             />
           </div>
@@ -255,22 +150,29 @@ export function ModelDefaultsView({
             presentation="adaptive"
             controlClassName="touch-control"
             onChange={(value) =>
-              setThinking(
-                value === "inherit"
-                  ? null
-                  : (levels.find((level) => level === value) ?? null),
-              )
+              setDraft({
+                model,
+                thinkingLevel:
+                  value === "inherit"
+                    ? null
+                    : (levels.find((level) => level === value) ?? null),
+              })
             }
           />
           <p className="muted">
-            保存值：{defaults.thinkingLevel ?? "使用原生默认"}
-            。模型支持范围以当前目录为准。
+            {dirty && !model && !thinking
+              ? "尚未保存：保存后，我的新对话将使用实例的模型和 Thinking 设置。"
+              : `已保存：${defaults.model ? modelKey(defaults.model) : "跟随实例"} · Thinking：${defaults.thinkingLevel ?? "使用原生默认"}`}
           </p>
           <Button
-            label="保存个人默认"
-            isDisabled={busy || !!pending}
+            label="保存默认设置"
+            isDisabled={busy || !!pending || !dirty}
             onClick={() => {
-              void save();
+              void personal
+                .save({ model, thinkingLevel: thinking })
+                .then((ok) => {
+                  if (ok) setDraft(null);
+                });
             }}
           />
         </div>

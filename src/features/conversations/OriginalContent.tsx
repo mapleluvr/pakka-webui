@@ -147,7 +147,12 @@ export function OriginalContent({
       signal.throwIfAborted();
       if (!navigator.clipboard) throw Error("当前浏览器无法复制，请下载原文。");
       await navigator.clipboard.writeText(text);
-      if (!signal.aborted) setNotice("已复制完整原文。");
+      if (!signal.aborted)
+        ui.notice({
+          tone: "success",
+          key: `copy:${reference.id}:${reference.revision}`,
+          message: "已复制完整原文",
+        });
     });
   }
   return (

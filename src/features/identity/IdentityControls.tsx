@@ -81,12 +81,7 @@ export function useIdentityControls(props: {
               className="flow"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (
-                  props.busy ||
-                  !token.trim() ||
-                  (kind === "invite" && !name.trim())
-                )
-                  return;
+                if (props.busy || !token.trim()) return;
                 void props
                   .login({
                     kind,
@@ -136,12 +131,11 @@ export function useIdentityControls(props: {
               />
               {kind === "invite" && (
                 <TextInput
-                  label="你的名字"
+                  label="名字（可选）"
                   value={name}
                   onChange={setName}
                   autoComplete="name"
                   controlClassName="touch-control"
-                  isRequired
                 />
               )}
               {props.error && (
@@ -159,11 +153,7 @@ export function useIdentityControls(props: {
                 label={props.busy ? "正在登录…" : "登录"}
                 type="submit"
                 form={formId}
-                isDisabled={
-                  props.busy ||
-                  !token.trim() ||
-                  (kind === "invite" && !name.trim())
-                }
+                isDisabled={props.busy || !token.trim()}
               />
               <Button
                 label="取消"
@@ -177,5 +167,5 @@ export function useIdentityControls(props: {
       />
     </Dialog>
   );
-  return { controls, dialog };
+  return { controls, dialog, openLogin: () => setOpen(true) };
 }

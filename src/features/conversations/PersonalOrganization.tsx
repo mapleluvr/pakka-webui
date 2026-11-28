@@ -1,4 +1,6 @@
 import { Button } from "@astryxdesign/core/Button";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { MoreIcon } from "./ReadingIcons.js";
 import { Selector } from "@astryxdesign/core/Selector";
 import type {
   PocketPersonalNavigation,
@@ -42,7 +44,7 @@ export function PersonalOrganization({
           controlClassName="touch-control"
         />
         <Selector
-          label="文件夹"
+          label="按文件夹筛选"
           value={folder}
           options={[
             { value: "*", label: "全部" },
@@ -56,35 +58,40 @@ export function PersonalOrganization({
           presentation="adaptive"
           controlClassName="touch-control"
         />
-        <Button
-          label="新建个人文件夹"
-          variant="ghost"
-          isDisabled={blocked}
-          onClick={() => setEditor({ kind: "folder", name: "" })}
-        />
-        <ul className="resource-list">
+        <div className="folder-heading">
+          <h3>我的文件夹</h3>
+          <Button
+            label="新建个人文件夹"
+            variant="ghost"
+            isDisabled={blocked}
+            onClick={() => setEditor({ kind: "folder", name: "" })}
+          />
+        </div>
+        <ul className="resource-list folder-list" aria-label="我的文件夹">
           {navigation.folders.map((row) => (
-            <li key={row.id} className="actions">
+            <li key={row.id}>
               <strong>{row.name}</strong>
-              <Button
-                label={`重命名文件夹 ${row.name}`}
-                variant="ghost"
+              <MoreMenu
+                label={`管理文件夹 ${row.name}`}
+                icon={<MoreIcon />}
+                alignment="end"
                 isDisabled={blocked}
-                onClick={() =>
-                  setEditor({ kind: "folder", id: row.id, name: row.name })
-                }
-              />
-              <Button
-                label={`删除文件夹 ${row.name}`}
-                variant="ghost"
-                isDisabled={blocked}
-                onClick={() =>
-                  setEditor({
-                    kind: "folder-delete",
-                    id: row.id,
-                    name: row.name,
-                  })
-                }
+                items={[
+                  {
+                    label: "重命名",
+                    onClick: () =>
+                      setEditor({ kind: "folder", id: row.id, name: row.name }),
+                  },
+                  {
+                    label: "删除",
+                    onClick: () =>
+                      setEditor({
+                        kind: "folder-delete",
+                        id: row.id,
+                        name: row.name,
+                      }),
+                  },
+                ]}
               />
             </li>
           ))}

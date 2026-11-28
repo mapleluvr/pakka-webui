@@ -1,3 +1,5 @@
+import type { PeopleSettings } from "@pakka/protocol/webui";
+import { POCKET_VERSION } from "@pakka/protocol/pocket";
 import {
   createPocketClient,
   PocketRemoteError,
@@ -23,6 +25,9 @@ export interface PakkaConnection {
   readonly workbench: PocketClient;
   readonly services: WebUiServiceClient;
   readonly extensions: ExtensionClient;
+  readonly peopleSettings: PeopleSettings;
+  refreshPeopleSettings(): Promise<PeopleSettings>;
+  subscribePeopleSettings(listener: () => void): () => void;
 }
 
 function csrf(): string | null {
@@ -61,7 +66,7 @@ export async function connectPakka(
     { signal },
   );
   if (
-    capabilities.capabilities.workbench !== 2 ||
+    capabilities.capabilities.workbench !== POCKET_VERSION ||
     capabilities.capabilities.extensions !== 3
   )
     throw new Error("前端与 Pakka 服务版本不兼容，请使用配对的版本。");
@@ -94,7 +99,48 @@ export async function connectPakka(
     request: (command, options) =>
       guarded(() => services.request(command, options)),
   };
+  let peopleSettings = (
+    await services.request({ op: "people.settings" }, { signal })
+  ).settings;
+  signal.throwIfAborted();
+  const settingsListeners = new Set<() => void>();
+  async function refreshPeopleSettings() {
+    const result = await guarded(() =>
+      services.request({ op: "people.settings" }, { signal }),
+    );
+    signal.throwIfAborted();
+    if (result.settings.version >= peopleSettings.version) {
+      peopleSettings = result.settings;
+      settingsListeners.forEach((listener) => listener());
+    }
+    return peopleSettings;
+  }
+  const refreshMode = () => {
+    if (!signal.aborted && document.visibilityState === "visible")
+      void refreshPeopleSettings().catch(() => {});
+  };
+  const modeTimer = window.setInterval(refreshMode, 30000);
+  window.addEventListener("focus", refreshMode);
+  signal.addEventListener(
+    "abort",
+    () => {
+      window.clearInterval(modeTimer);
+      window.removeEventListener("focus", refreshMode);
+      settingsListeners.clear();
+    },
+    { once: true },
+  );
   return Object.freeze<PakkaConnection>({
+    get peopleSettings() {
+      return peopleSettings;
+    },
+    refreshPeopleSettings,
+    subscribePeopleSettings(listener) {
+      settingsListeners.add(listener);
+      return () => {
+        settingsListeners.delete(listener);
+      };
+    },
     identity: JSON.stringify([hello.serverId, hello.person.id]),
     origin,
     person: hello.person,
@@ -165,7 +211,8 @@ export function describeFailure(error: unknown): string {
       CAPACITY: "服务正忙，请稍后读取状态。",
       UNSUPPORTED: "当前服务不支持此能力。",
       INVALID_REQUEST: "请求未通过校验，请检查输入。",
-      UNKNOWN: "结果尚未确认；请核对原请求，勿重复提交。",
+      UNKNOWN:
+        "暂时无法确认服务状态。请检查连接；如果刚刚提交了更改，请勿重复提交。",
     };
     return messages[error.code] ?? "操作未能完成。";
   }

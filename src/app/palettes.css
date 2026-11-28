@@ -1,0 +1,196 @@
+/* Static overrides of Astryx's public semantic tokens, including portal roots. */
+:root[data-pakka-palette="plum"] {
+  --palette-paper: #e9e4d5;
+  --palette-ink: #4e2a3a;
+}
+:root[data-pakka-palette="jade"] {
+  --palette-paper: #e7ece8;
+  --palette-ink: #243836;
+}
+:root[data-pakka-palette="blue"] {
+  --palette-paper: #fff4e3;
+  --palette-ink: #2f5d8a;
+}
+:root[data-pakka-palette="pine"] {
+  --palette-paper: #fff;
+  --palette-ink: #244d3a;
+  --palette-pine: #ffc44f;
+  --palette-mugwort: #5ecd8c;
+}
+:root:where([data-pakka-palette]:not([data-pakka-palette="neutral"])),
+:root:where([data-pakka-palette]:not([data-pakka-palette="neutral"]))
+  [data-astryx-theme="neutral"] {
+  --palette-background: light-dark(var(--palette-paper), var(--palette-ink));
+  --palette-text: light-dark(var(--palette-ink), var(--palette-paper));
+  --palette-surface: light-dark(
+    color-mix(in srgb, var(--palette-paper) 55%, white),
+    color-mix(in srgb, var(--palette-ink) 90%, var(--palette-paper))
+  );
+  --color-background-body: var(--palette-background);
+  --color-background-surface: var(--palette-surface);
+  --color-background-card: var(--palette-surface);
+  --color-background-popover: var(--palette-surface);
+  --color-background-muted: color-mix(
+    in srgb,
+    var(--palette-background) 92%,
+    var(--palette-text)
+  );
+  --color-background-inverted: var(--palette-text);
+  --color-text-primary: var(--palette-text);
+  --color-text-secondary: color-mix(
+    in srgb,
+    var(--palette-text) 85%,
+    var(--palette-background)
+  );
+  --color-text-disabled: color-mix(
+    in srgb,
+    var(--palette-text) 50%,
+    var(--palette-background)
+  );
+  --color-text-accent: var(--palette-text);
+  --color-accent: var(--palette-text);
+  --color-on-accent: var(--palette-background);
+  --color-accent-muted: color-mix(
+    in srgb,
+    var(--palette-background) 82%,
+    var(--palette-text)
+  );
+  --color-neutral: color-mix(
+    in srgb,
+    var(--palette-background) 84%,
+    var(--palette-text)
+  );
+  --color-icon-primary: var(--color-text-primary);
+  --color-icon-secondary: var(--color-text-secondary);
+  --color-icon-disabled: var(--color-text-disabled);
+  --color-icon-accent: var(--color-text-accent);
+  --color-border: color-mix(
+    in srgb,
+    var(--palette-text) 22%,
+    var(--palette-background)
+  );
+  --color-border-emphasized: color-mix(
+    in srgb,
+    var(--palette-text) 45%,
+    var(--palette-background)
+  );
+  --color-track: var(--color-border-emphasized);
+  --color-skeleton: var(--color-neutral);
+  --color-tint-hover: var(--palette-text);
+  --color-overlay-hover: color-mix(
+    in srgb,
+    var(--palette-text) 7%,
+    transparent
+  );
+  --color-overlay-pressed: color-mix(
+    in srgb,
+    var(--palette-text) 13%,
+    transparent
+  );
+  --color-overlay: color-mix(in srgb, var(--palette-ink) 72%, transparent);
+  --color-shadow: light-dark(
+    color-mix(in srgb, var(--palette-ink) 16%, transparent),
+    color-mix(in srgb, var(--palette-ink) 65%, black 35%)
+  );
+  --shadow-low: 0 2px 6px
+    color-mix(in srgb, var(--color-shadow) 45%, transparent);
+  --shadow-med:
+    0 6px 20px color-mix(in srgb, var(--color-shadow) 65%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--palette-text) 8%, transparent);
+  --shadow-high:
+    0 16px 48px color-mix(in srgb, var(--color-shadow) 75%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--palette-text) 14%, transparent);
+  --shadow-inset-hover: inset 0 0 0 2px var(--color-border-emphasized);
+  --shadow-inset-selected: inset 0 0 0 2px var(--color-text-accent);
+  --color-text-gray: var(--palette-text);
+  --color-background-gray: var(--color-background-muted);
+  --color-text-info: light-dark(#285574, #c9e6ff);
+  --color-text-success: light-dark(#24603c, #c0f0cf);
+  --color-text-warning: light-dark(#774d0c, #ffe2a8);
+  --color-text-error: light-dark(#982a43, #ffd0d7);
+  --color-text-danger: var(--color-text-error);
+  --color-on-info-muted: var(--color-text-info);
+  --color-on-success-muted: var(--color-text-success);
+  --color-on-warning-muted: var(--color-text-warning);
+  --color-on-error-muted: var(--color-text-error);
+  --color-info-muted: color-mix(
+    in srgb,
+    var(--palette-background) 90%,
+    var(--color-text-info)
+  );
+  --color-success-muted: color-mix(
+    in srgb,
+    var(--palette-background) 90%,
+    var(--color-text-success)
+  );
+  --color-warning-muted: color-mix(
+    in srgb,
+    var(--palette-background) 90%,
+    var(--color-text-warning)
+  );
+  --color-error-muted: color-mix(
+    in srgb,
+    var(--palette-background) 90%,
+    var(--color-text-error)
+  );
+  --color-info: #285574;
+  --color-success: #24603c;
+  --color-error: #982a43;
+  --color-warning: #ffe2a8;
+  --color-on-info: #fff;
+  --color-on-success: #fff;
+  --color-on-error: #fff;
+  --color-on-warning: #4e2a3a;
+}
+:root[data-pakka-palette="blue"],
+:root[data-pakka-palette="blue"] [data-astryx-theme="neutral"] {
+  --palette-surface: color-mix(in srgb, var(--palette-ink) 90%, #12293f);
+  --color-neutral: color-mix(
+    in srgb,
+    var(--palette-ink) 94%,
+    var(--palette-paper)
+  );
+  --color-accent-muted: #264d73;
+  --color-text-secondary: color-mix(
+    in srgb,
+    var(--palette-paper) 90%,
+    var(--palette-ink)
+  );
+}
+:root[data-pakka-palette="pine"],
+:root[data-pakka-palette="pine"] [data-astryx-theme="neutral"] {
+  --color-text-accent: var(--palette-pine);
+  --color-icon-accent: var(--palette-pine);
+  --color-accent: #326749;
+  --color-on-accent: #fff;
+  --color-accent-muted: color-mix(
+    in srgb,
+    var(--palette-mugwort) 18%,
+    var(--palette-ink)
+  );
+}
+:root[data-pakka-palette="pine"] .workspace {
+  background-image:
+    radial-gradient(ellipse at 100% 0, #ffc44f26, transparent 60%),
+    radial-gradient(ellipse at 30% 100%, #5ecd8c26, transparent 70%);
+}
+:root[data-pakka-palette="pine"] .sidebar,
+:root[data-pakka-palette="pine"] .mobile-workspace-heading {
+  border-color: color-mix(
+    in srgb,
+    var(--palette-mugwort) 40%,
+    var(--palette-ink)
+  );
+}
+:root[data-pakka-palette]:not([data-pakka-palette="neutral"]) .home-primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-border-emphasized);
+  box-shadow: var(--shadow-low);
+}
+:root[data-pakka-palette]:not([data-pakka-palette="neutral"]) .surface {
+  box-shadow: var(--shadow-low);
+}
+:root[data-pakka-palette]:not([data-pakka-palette="neutral"]) .notice {
+  box-shadow: var(--shadow-med);
+}

@@ -8,24 +8,39 @@ import type { ReactNode } from "react";
 import { ImageContent } from "./ImageContent.js";
 import { useDisclosure } from "./ReadingState.js";
 import type { ToolContent } from "./transcript.js";
+import { UiIcon } from "@pakka/webui-sdk/icons";
+import { ToolDetails } from "./ToolDetails.js";
+import { firstLine, toolPresentation } from "./tool-presentation.js";
+import { readableThought } from "./transcript.js";
 
-function Thinking({
+export function Thinking({
   part,
   identity,
+  actions,
   ...bindings
 }: ContentBindings & {
   part: Extract<PocketPart, { type: "thinking" }>;
   identity: string;
+  actions?: ReactNode;
 }) {
   const [open, setOpen] = useDisclosure(identity);
+  if (!readableThought(part)) return null;
   return (
     <details
+      className="thought-row"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>Thinking</summary>
+      <summary className="thought-summary">
+        <UiIcon name="thought" />
+        <span>Thinking</span>
+        <span className="thought-excerpt">{firstLine(part.thinking)}</span>
+        <UiIcon name="chevron" className="activity-chevron" />
+      </summary>
       {open && (
         <TextContent
+          panel={{ title: "思考摘要" }}
+          extraActions={actions}
           text={part.thinking}
           reference={part.contentReference}
           {...bindings}
@@ -94,19 +109,10 @@ export function MessageBody({
                   {...bindings}
                 />
               );
-            case "toolCall":
+            default:
               return null; // Rendered once by the transcript's source-aware tool index.
           }
         })
-      )}
-      {message.errorMessage && (
-        <div className="error-text">
-          <TextContent
-            text={message.errorMessage}
-            reference={message.errorReference}
-            {...bindings}
-          />
-        </div>
       )}
     </>
   );
@@ -115,86 +121,59 @@ export function ToolCard({
   tool,
   identity,
   source,
+  actions,
   ...bindings
-}: ContentBindings & { tool: ToolContent; identity: string; source: string }) {
+}: ContentBindings & {
+  tool: ToolContent;
+  identity: string;
+  source: string;
+  actions?: ReactNode;
+}) {
   const [open, setOpen] = useDisclosure(identity);
-  const status = tool.result
-    ? tool.result.isError
-      ? "失败"
-      : "已结束"
-    : tool.live
-      ? { pending: "待执行", running: "执行中", done: "已结束" }[
-          tool.live.status
-        ]
-      : "调用已记录";
-  const size =
-    (tool.declaration?.contentReference?.byteLength ?? 0) +
-    (tool.result?.contentReference?.byteLength ?? 0) +
-    (Array.isArray(tool.result?.content)
-      ? tool.result.content.reduce(
-          (sum, part) => sum + (part.contentReference?.byteLength ?? 0),
-          0,
-        )
-      : 0);
+  let status = "调用已记录";
+  if (tool.result) status = tool.result.isError ? "失败" : "已结束";
+  else if (tool.live)
+    status = { pending: "待执行", running: "执行中", done: "已结束" }[
+      tool.live.status
+    ];
+  const presentation = toolPresentation(tool);
+  const { excerpt, icon, elapsed } = presentation;
+  const running = !tool.result && tool.live?.status === "running";
   return (
     <details
-      className="message tool-card"
+      className="tool-card"
       open={open}
       data-tool-call-id={tool.callId}
       data-source-conversation={source}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>
-        <span>
-          工具 · {tool.name} · {status}
-        </span>
-        <span className="muted">
-          {size > 0 && ` · 原文 ${size.toLocaleString()} 字节`}
-          {!tool.declaration && " · 调用声明不在当前页"}
-        </span>
-        {!!(tool.live?.droppedBytes || tool.live?.droppedLines) && (
-          <span className="muted">
-            {" "}
-            · 源采集已省略 {tool.live?.droppedBytes ?? 0} 字节 /{" "}
-            {tool.live?.droppedLines ?? 0} 行
+      <summary className="tool-summary">
+        <UiIcon name={icon} />
+        <code className="tool-excerpt">{excerpt || tool.name}</code>
+        <span className="tool-trailing">
+          {excerpt && <span className="tool-kind">{tool.name}</span>}
+          <span
+            className="tool-status"
+            data-error={tool.result?.isError || undefined}
+          >
+            {tool.result && (
+              <UiIcon name={tool.result.isError ? "error" : "check"} />
+            )}
+            {running && <UiIcon className="activity-spinner" name="spinner" />}
+            {status}
+            {elapsed && ` · ${elapsed}`}
           </span>
-        )}
+        </span>
+        <UiIcon name="chevron" className="activity-chevron" />
       </summary>
       {open && (
-        <div className="flow tool-details">
-          <p className="muted identifier">调用 {tool.callId}</p>
-          {tool.declaration && (
-            <section className="flow compact" aria-label="工具参数">
-              <h3>参数</h3>
-              <TextContent
-                text={JSON.stringify(tool.declaration.arguments, null, 2)}
-                reference={tool.declaration.contentReference}
-                format="json"
-                {...bindings}
-              />
-            </section>
-          )}
-          {tool.result && (
-            <section className="flow compact" aria-label="工具结果">
-              <h3>结果</h3>
-              <MessageBody
-                message={tool.result}
-                identity={`${identity}/result`}
-                {...bindings}
-              />
-            </section>
-          )}
-          {!tool.result && tool.live?.output && (
-            <section className="flow compact" aria-label="工具活动输出">
-              <h3>当前输出</h3>
-              <TextContent
-                text={tool.live.output}
-                reference={tool.live.contentReference}
-                {...bindings}
-              />
-            </section>
-          )}
-        </div>
+        <ToolDetails
+          tool={tool}
+          identity={identity}
+          presentation={presentation}
+          actions={actions}
+          {...bindings}
+        />
       )}
     </details>
   );

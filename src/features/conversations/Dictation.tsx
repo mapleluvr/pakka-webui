@@ -9,6 +9,7 @@ import {
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { MicrophoneIcon } from "./ComposerIcons.js";
+import { Dialog } from "@astryxdesign/core/Dialog";
 
 /** The browser owns capture, permission and its speech provider. */
 interface Recognition {
@@ -264,57 +265,42 @@ export function Dictation({
     return () => window.removeEventListener("keydown", shortcut);
   });
   const available = isSecureContext && !!browserRecognizer();
-  return (
-    <div
-      className="dictation flow compact"
-      data-phase={phase}
-      data-available={available || undefined}
-      aria-label="语音草稿"
-    >
+  const content = (
+    <>
       <div className="actions">
-        {compact && phase === "idle" && !text ? (
-          <IconButton
-            label="浏览器听写"
-            icon={<MicrophoneIcon />}
-            variant="ghost"
-            type="button"
-            isDisabled={!available || !enabled}
-            onClick={start}
-          />
-        ) : (
-          <Button
-            label={
-              phase === "listening"
-                ? "结束听写"
-                : phase === "stopping"
-                  ? "正在结束…"
-                  : "浏览器听写"
-            }
-            variant="ghost"
-            type="button"
-            isDisabled={!available || !enabled || phase === "stopping"}
-            onClick={() => {
-              if (phase === "listening") stop();
-              else start();
-            }}
-          />
-        )}
-        {(phase !== "idle" || text) && (
-          <Button
-            label="取消听写"
-            variant="ghost"
-            type="button"
-            onClick={cancel}
-          />
-        )}
-        <span className="dictation-help muted" id={id}>
-          {available
-            ? "Alt+V · 语音由浏览器识别，插入草稿后再发送。"
-            : "当前浏览器未提供安全的语音识别入口，可直接输入。"}
-        </span>
+        <Button
+          label={
+            phase === "listening"
+              ? "结束听写"
+              : phase === "stopping"
+                ? "正在结束…"
+                : "浏览器听写"
+          }
+          variant="ghost"
+          type="button"
+          isDisabled={!available || !enabled || phase === "stopping"}
+          onClick={() => {
+            if (phase === "listening") stop();
+            else start();
+          }}
+        />
+        <Button
+          label="关闭听写"
+          variant="ghost"
+          type="button"
+          onClick={() => {
+            cancel();
+            setError(null);
+          }}
+        />
       </div>
+      <p className="muted" id={id}>
+        {available
+          ? "Alt+V · 语音由浏览器识别，插入草稿后再发送。"
+          : "当前浏览器未提供安全的语音识别入口，可直接输入。"}
+      </p>
       {(text || interim || phase !== "idle") && (
-        <div className="surface flow compact" aria-describedby={id}>
+        <div className="flow compact" aria-describedby={id}>
           <p role="status">
             {phase === "idle" ? "识别结果" : "正在听写"}：{text}
             <span className="muted">{interim ? " " + interim : ""}</span>
@@ -335,6 +321,45 @@ export function Dictation({
         <p className="error-text" role="alert">
           {error}
         </p>
+      )}
+    </>
+  );
+  return (
+    <div
+      className="dictation flow compact"
+      data-phase={phase}
+      data-available={available || undefined}
+      aria-label="语音草稿"
+    >
+      {compact ? (
+        <>
+          <IconButton
+            label={available ? "浏览器听写" : "当前浏览器不支持听写"}
+            icon={<MicrophoneIcon />}
+            variant="ghost"
+            type="button"
+            isDisabled={!available || !enabled}
+            onClick={start}
+          />
+          <Dialog
+            isOpen={!!(text || interim || error || phase !== "idle")}
+            onOpenChange={(open) => {
+              if (!open) {
+                cancel();
+                setError(null);
+              }
+            }}
+            aria-label="语音草稿"
+            width="min(560px, calc(100vw - 24px))"
+          >
+            <div className="dialog-content flow">
+              <h2>语音草稿</h2>
+              {content}
+            </div>
+          </Dialog>
+        </>
+      ) : (
+        content
       )}
     </div>
   );

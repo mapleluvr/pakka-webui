@@ -48,6 +48,6 @@ const app = await startPocket({
 
 替换前端使用另一个已核对的完整归档及其 manifest pin。当前 Node 装配在启动时载入固定资产；切换候选按正常停止/重开流程进行，显式保留原 Session 定位和服务配置，不宣称支持进程内资产热替换。
 
-回退选择兼容的旧前端，原数据库、Session、已接纳工作与 unknown 请求继续保留。不同 services 主版本须重新核对，阶段 3 的 services 3 归档不能直接用于要求 services 4 的当前默认组合。资产格式、服务协议、UI SDK/renderer 分别核对。完整默认发行、独立部署、registry 发布和合并仍遵循各自的授权与验收。
+回退选择兼容的旧前端，原数据库、Session、已接纳工作与 unknown 请求继续保留。不同 services 主版本须重新核对，当前要求 services 7 / workbench 3，旧 services 6 / workbench 3 及更早归档不能用于新版宿主；相反方向同样不兼容。资产格式、服务协议、UI SDK/renderer 分别核对。完整默认发行、独立部署、registry 发布和合并仍遵循各自的授权与验收。
 
 当前默认组合与兼容回退见[阶段 5 验证](../verification/PHASE-5.md)；[阶段 3 验证](../verification/PHASE-3.md)保留原候选的历史结果。

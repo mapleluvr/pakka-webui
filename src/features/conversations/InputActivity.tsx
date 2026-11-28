@@ -1,5 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
+import {
+  ConversationPanel,
+  useConversationPanelTrigger,
+} from "./ConversationPanel.js";
+import { InputReceiptRow } from "./InputReceiptRow.js";
+import { createPortal } from "react-dom";
+import { ComposerIcon } from "./ComposerIcons.js";
 import { PocketRemoteError, type AgentRef } from "@pakka/client/pocket";
 import { decodeTarget } from "@pakka/protocol/extension-rpc";
 import type { ConversationInputHistory } from "@pakka/protocol/webui";
@@ -14,6 +21,9 @@ import {
   requestSignal,
   type PakkaConnection,
 } from "../../integrations/pakka/connection.js";
+
+import { ReadingIcon } from "./ReadingIcons.js";
+import { inputStatus } from "./input-labels.js";
 
 type Control = {
   requestId: string;
@@ -40,7 +50,6 @@ function decodeControl(value: unknown): Control {
     throw new Error("原回执不可读。");
   return value as Control;
 }
-import { inputModeLabel, inputStatus } from "./input-labels.js";
 
 /** Server-owned receipts; a lost mutation response only leads to observation. */
 export function InputActivity({
@@ -49,13 +58,19 @@ export function InputActivity({
   target,
   running,
   revision,
+  page,
+  setPage,
   disabled,
+  stopTarget,
 }: {
+  stopTarget: HTMLElement | null;
   ui: UiContext;
   connection: PakkaConnection;
   target: AgentRef;
   running: boolean;
   revision: number;
+  page: ConversationInputHistory | null;
+  setPage(page: ConversationInputHistory | null): void;
   disabled: boolean;
 }) {
   const key = JSON.stringify([
@@ -68,18 +83,25 @@ export function InputActivity({
   const [pending, setPending] = useState<Control | "unreadable" | null>(() =>
     readPending(key, decodeControl),
   );
-  const [page, setPage] = useState<ConversationInputHistory | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
   const [expanded, setExpanded] = useState(() => pending !== null);
   const detailsId = useId();
+  const historyTrigger = useConversationPanelTrigger(
+    "history",
+    expanded,
+    () => setExpanded(true),
+    () => setExpanded(false),
+  );
   useEffect(() => {
-    if (pending || error || notice) setExpanded(true);
-  }, [pending, error, notice]);
+    if (!busy && (pending || error || readError)) setExpanded(true);
+  }, [pending, error, readError, busy]);
   const admission = useRef(false);
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
   useEffect(() => {
@@ -91,10 +113,13 @@ export function InputActivity({
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (disabled) {
       setPage(null);
+      setReading(false);
+      setReadError(null);
       return () => controller.abort();
     }
     const read = async () => {
       setReading(true);
+      setReadError(null);
       try {
         const value = await connection.services.request(
           { op: "input.history", target, ...(cursor ? { cursor } : {}) },
@@ -102,7 +127,6 @@ export function InputActivity({
         );
         if (signal.aborted) return;
         setPage(value.page);
-        setError(null);
         if (
           running ||
           value.page.items.some(
@@ -116,7 +140,7 @@ export function InputActivity({
       } catch (reason) {
         if (!signal.aborted) {
           setPage(null);
-          setError(describeFailure(reason));
+          setReadError(describeFailure(reason));
         }
       } finally {
         if (!signal.aborted) setReading(false);
@@ -127,7 +151,17 @@ export function InputActivity({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [ui, connection, target, running, revision, refresh, cursor, disabled]);
+  }, [
+    ui,
+    connection,
+    target,
+    running,
+    revision,
+    refresh,
+    cursor,
+    disabled,
+    setPage,
+  ]);
   async function control(op: Control["op"], id?: string) {
     if (admission.current || !alive() || disabled) return;
     const original: Control = {
@@ -244,124 +278,163 @@ export function InputActivity({
   }
   return (
     <section className="input-activity" aria-label="我的输入回执">
-      <header className="input-activity-bar">
-        <button
-          type="button"
-          className="input-summary"
-          aria-expanded={expanded}
-          aria-controls={detailsId}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
+      {running &&
+        stopTarget &&
+        createPortal(
+          <button
+            type="button"
+            className="composer-primary"
+            aria-label="停止当前工作"
+            title="停止当前工作"
+            disabled={
+              disabled ||
+              busy ||
+              !!pending ||
+              connection.person.role !== "admin"
+            }
+            onClick={() => {
+              void control("abort");
+            }}
           >
-            <path d={expanded ? "m4 10 4-4 4 4" : "m4 6 4 4 4-4"} />
-          </svg>
-          <span>我的输入</span>
-          <span className="input-summary-status">
-            {pending
-              ? "控制请求待核对"
-              : page?.items[0]
-                ? inputStatus[page.items[0].receipt.status]
-                : reading
-                  ? "正在读取…"
-                  : "当前清单暂无输入"}
-          </span>
-        </button>
-        <div className="actions">
-          <Button
-            label={reading ? "正在读取…" : "刷新回执"}
-            variant="ghost"
-            isDisabled={reading || disabled}
-            onClick={() => setRefresh((value) => value + 1)}
-          />
-          {running && connection.person.role === "admin" && (
-            <Button
-              label="停止当前工作"
-              variant="ghost"
-              isDisabled={disabled || busy || !!pending}
-              onClick={() => {
-                void control("abort");
-              }}
-            />
-          )}
-        </div>
-      </header>
-      <div
-        className="input-activity-body flow"
-        id={detailsId}
-        hidden={!expanded}
+            <ComposerIcon name="stop" />
+          </button>,
+          stopTarget,
+        )}
+      <button
+        type="button"
+        className="input-summary"
+        ref={trigger}
+        aria-label="我的输入"
+        title={pending ? "我的输入 · 控制请求待核对" : "我的输入"}
+        aria-controls={expanded ? detailsId : undefined}
+        {...historyTrigger}
       >
-        {error && (
-          <p role="alert" className="error-text">
-            {error}
-          </p>
-        )}
-        {notice && <p role="status">{notice}</p>}
-        {pending && (
-          <div className="flow compact">
-            <p>
-              {pending === "unreadable"
-                ? "本地控制记录不可读；请保留原记录。"
-                : `控制请求 ${pending.requestId} 尚未确认。`}
-            </p>
-            <Button
-              label="核对控制结果"
-              variant="ghost"
-              isDisabled={busy || pending === "unreadable" || disabled}
+        <ComposerIcon name="history" />
+      </button>
+      {expanded && (
+        <ConversationPanel
+          kind="history"
+          id={detailsId}
+          title="我的输入"
+          trigger={trigger}
+          onClose={() => setExpanded(false)}
+          actions={
+            <button
+              type="button"
+              className="reader-action input-refresh"
+              aria-label="刷新输入状态"
+              aria-busy={reading}
+              aria-disabled={reading || disabled}
+              title={reading ? "正在刷新输入清单…" : "刷新输入状态"}
               onClick={() => {
-                void check();
+                if (!reading && !disabled) setRefresh((value) => value + 1);
               }}
-            />
-          </div>
-        )}
-        {page && !page.items.length && (
-          <p className="muted">当前没有你的已接纳输入。</p>
-        )}
-        {page?.items.map((item) => (
-          <article className="flow compact" key={item.receipt.id}>
-            <header>
-              {inputModeLabel[item.mode]} · {inputStatus[item.receipt.status]}
-              {item.receipt.reason ? ` · ${item.receipt.reason}` : ""}
-            </header>
-            <p className="message-text">
-              {item.preview}
-              {item.truncated ? "（预览）" : ""}
+            >
+              <ReadingIcon name={reading ? "processing" : "refresh"} />
+            </button>
+          }
+          footer={
+            (cursor || page?.nextCursor) && (
+              <>
+                {cursor && (
+                  <Button
+                    label="最近输入"
+                    variant="ghost"
+                    isDisabled={reading || disabled}
+                    onClick={() => setCursor(undefined)}
+                  />
+                )}
+                {page?.nextCursor && (
+                  <Button
+                    label="更早输入"
+                    variant="ghost"
+                    isDisabled={reading || disabled}
+                    onClick={() => setCursor(page.nextCursor)}
+                  />
+                )}
+              </>
+            )
+          }
+        >
+          {error && (
+            <p role="alert" className="error-text">
+              {error}
             </p>
-            {item.receipt.status === "queued" &&
-              connection.person.role !== "viewer" && (
-                <Button
-                  label="撤回此输入"
-                  variant="ghost"
-                  isDisabled={disabled || busy || !!pending}
-                  onClick={() => {
-                    void control("withdraw", item.receipt.id);
-                  }}
-                />
+          )}
+          {notice && <p role="status">{notice}</p>}
+          {pending && (
+            <div className="input-pending-control">
+              <p>
+                {pending === "unreadable"
+                  ? "本地控制记录不可读；请保留原记录。"
+                  : "原控制请求仍待核对，请勿重复操作。"}
+              </p>
+              {pending !== "unreadable" && (
+                <details className="panel-details">
+                  <summary>控制请求详情</summary>
+                  <dl>
+                    <dt>操作</dt>
+                    <dd>
+                      {pending.op === "abort" ? "停止当前工作" : "撤回此输入"}
+                    </dd>
+                    <dt>原请求</dt>
+                    <dd>{pending.requestId}</dd>
+                    {pending.id && (
+                      <>
+                        <dt>输入回执</dt>
+                        <dd>{pending.id}</dd>
+                      </>
+                    )}
+                  </dl>
+                </details>
               )}
-          </article>
-        ))}
-        <div className="actions">
-          <Button
-            label="最近输入"
-            variant="ghost"
-            isDisabled={!cursor || reading}
-            onClick={() => setCursor(undefined)}
-          />
-          <Button
-            label="更早输入"
-            variant="ghost"
-            isDisabled={!page?.nextCursor || reading}
-            onClick={() => setCursor(page?.nextCursor)}
-          />
-        </div>
-      </div>
+              <Button
+                label="核对控制结果"
+                variant="ghost"
+                isDisabled={busy || pending === "unreadable" || disabled}
+                onClick={() => {
+                  void check();
+                }}
+              />
+            </div>
+          )}
+          {readError && (
+            <p role="alert" className="error-text">
+              输入清单读取失败：{readError}
+            </p>
+          )}
+          {!page && !readError && (
+            <p className="input-list-state">
+              {disabled ? "当前无法读取输入清单。" : "正在读取输入清单…"}
+            </p>
+          )}
+          {page && reading && (
+            <span className="visually-hidden">正在刷新输入清单…</span>
+          )}
+          {page && !page.items.length && (
+            <p className="input-list-state">当前没有你的已接纳输入。</p>
+          )}
+          {page && page.items.length > 0 && (
+            <ol className="input-receipts" aria-label="输入记录">
+              {page.items.map((item) => (
+                <InputReceiptRow
+                  key={item.receipt.id}
+                  item={item}
+                  disabled={disabled || busy || !!pending}
+                  onWithdraw={
+                    item.receipt.status === "queued" &&
+                    connection.person.role !== "viewer"
+                      ? () => {
+                          void control("withdraw", item.receipt.id);
+                        }
+                      : undefined
+                  }
+                />
+              ))}
+            </ol>
+          )}
+        </ConversationPanel>
+      )}
     </section>
   );
 }

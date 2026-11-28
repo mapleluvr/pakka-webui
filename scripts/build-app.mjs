@@ -36,6 +36,7 @@ export async function buildApplication() {
     entryNames: "[name]-[hash]",
     chunkNames: "chunks/[name]-[hash]",
     assetNames: "assets/[name]-[hash]",
+    loader: { ".svg": "file" },
     bundle: true,
     splitting: true,
     format: "esm",
@@ -78,9 +79,12 @@ export async function buildApplication() {
     const absolute = resolve(root, path);
     const local = relative(outdir, absolute).replaceAll("\\", "/");
     const bytes = await readFile(absolute);
-    const type = path.endsWith(".css")
-      ? "text/css; charset=utf-8"
-      : "text/javascript; charset=utf-8";
+    const type = {
+      css: "text/css; charset=utf-8",
+      svg: "image/svg+xml",
+      js: "text/javascript; charset=utf-8",
+    }[path.split(".").at(-1)];
+    if (!type) throw new Error(`Unsupported application asset: ${path}`);
     files.push({ path: local, sha256: digest(bytes), type });
     if (metadata.entryPoint === "src/app/main.tsx" && path.endsWith(".js"))
       entry = local;
@@ -157,8 +161,20 @@ export async function buildApplication() {
     "<",
     "\\u003c",
   );
+  const icons = ["pakka-logo-", "pakka-logo-dark-"]
+    .map((name, index) => {
+      const file = appFiles.find(
+        (file) =>
+          file.path.startsWith(`app/assets/${name}`) &&
+          (index === 1 || !file.path.startsWith("app/assets/pakka-logo-dark-")),
+      );
+      if (!file) throw new Error(`Missing brand asset: ${name}`);
+      const mode = index === 0 ? "light" : "dark";
+      return `<link rel="icon" type="image/svg+xml" data-brand-icon="${mode}" media="(prefers-color-scheme: ${mode})" href="${file.url}">`;
+    })
+    .join("\n");
   const html = `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f8f9fb"><title>Pakka</title><link rel="icon" href="data:,">
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f8f9fb"><title>Pakka</title>${icons}
 ${styles.map((url) => `<link rel="stylesheet" href="${url}">`).join("\n")}
 <script type="importmap">${imports}</script><script type="module" src="${prefix + entry}"></script></head>
 <body><div id="app"></div><noscript>Pakka 需要启用 JavaScript 才能使用。</noscript></body></html>\n`;

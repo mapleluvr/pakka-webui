@@ -4,6 +4,7 @@ import {
   type PocketClientResult,
 } from "@pakka/client/pocket";
 import {
+  POCKET_VERSION,
   decodePocketRequest,
   type PocketCommand,
   type PocketOriginalCommand,
@@ -19,10 +20,16 @@ import {
 export type WorkspaceChange =
   | PocketOriginalCommand
   | Extract<PocketCommand, { op: "session.create" | "navigation.update" }>;
-type Original = { requestId: string; command: WorkspaceChange };
+export type WorkspaceOriginal = {
+  requestId: string;
+  command: WorkspaceChange;
+  // Labels at submission, including folders that no longer exist on recovery.
+  folderName?: string;
+  conversationName?: string;
+};
 const requestId = (command: WorkspaceChange) =>
   "input" in command ? command.input.requestId : command.requestId;
-function decode(value: unknown): Original {
+function decode(value: unknown): WorkspaceOriginal {
   if (
     !value ||
     typeof value !== "object" ||
@@ -31,7 +38,7 @@ function decode(value: unknown): Original {
   )
     throw new Error("原请求不可读。");
   const { command } = decodePocketRequest({
-    version: 2,
+    version: POCKET_VERSION,
     requestId: value.requestId,
     command: value.command,
   });
@@ -48,7 +55,17 @@ function decode(value: unknown): Original {
   const original = command as WorkspaceChange;
   if (requestId(original) !== value.requestId)
     throw new Error("原请求身份不匹配。");
-  return { requestId: requestId(original), command: original };
+  return {
+    requestId: requestId(original),
+    command: original,
+    ...("folderName" in value && typeof value.folderName === "string"
+      ? { folderName: value.folderName }
+      : {}),
+    ...("conversationName" in value &&
+    typeof value.conversationName === "string"
+      ? { conversationName: value.conversationName }
+      : {}),
+  };
 }
 function lookup(command: WorkspaceChange): PocketCommand {
   if (command.op === "session.create")
@@ -80,31 +97,34 @@ export function useWorkspaceChange(
     connection.person.id,
     scope,
   ]);
-  const [pending, setPending] = useState<Original | "unreadable" | null>(() =>
-    readPending(key, decode),
-  );
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<
+    WorkspaceOriginal | "unreadable" | null
+  >(() => readPending(key, decode));
+  const [activity, setActivity] = useState<"save" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const admission = useRef(false);
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
-  async function run(command?: WorkspaceChange) {
+  async function run(
+    command?: WorkspaceChange,
+    labels?: Pick<WorkspaceOriginal, "folderName" | "conversationName">,
+  ) {
     if (admission.current || !alive()) return;
     admission.current = true;
-    setBusy(true);
+    setActivity(command ? "save" : "check");
     setError(null);
-    let original: Original | "unreadable" | null = null;
+    let original: WorkspaceOriginal | "unreadable" | null = null;
     try {
       original = command
         ? claimPending(
             key,
-            decode({ requestId: requestId(command), command }),
+            decode({ requestId: requestId(command), command, ...labels }),
             decode,
           )
         : readPending(key, decode);
       setPending(original);
       if (!original || original === "unreadable") return;
       if (command && original.requestId !== requestId(command)) {
-        setError("此作用域已有待核对操作，请先核对原请求。");
+        setError("还有一项更改未确认，请先查看它的状态。");
         return;
       }
       const result = await connection.workbench.request(
@@ -115,13 +135,14 @@ export function useWorkspaceChange(
         },
       );
       if (!confirmed(result)) {
-        if (alive()) setError("原操作尚未确认；原请求仍保留，不能重复提交。");
+        if (alive())
+          setError("还没有查到这次更改的回执。可以稍后再查看，不必重新保存。");
         return;
       }
       const remaining = clearPending(key, original.requestId, decode);
       if (alive()) {
         setPending(remaining);
-        return result;
+        return { result, original };
       }
     } catch (reason) {
       if (
@@ -138,11 +159,27 @@ export function useWorkspaceChange(
           /* Keep the original on local acknowledgement failure. */
         }
       }
-      if (alive()) setError(describeFailure(reason));
+      if (alive())
+        setError(
+          reason instanceof PocketRemoteError &&
+            reason.code === "UNKNOWN" &&
+            original &&
+            original !== "unreadable"
+            ? command
+              ? "未收到保存回执。"
+              : "暂时无法读取这次更改的回执，请稍后再查看。"
+            : describeFailure(reason),
+        );
     } finally {
       admission.current = false;
-      if (alive()) setBusy(false);
+      if (alive()) setActivity(null);
     }
   }
-  return { pending, busy, error, run };
+  return {
+    pending,
+    busy: !!activity,
+    checking: activity === "check",
+    error,
+    run,
+  };
 }

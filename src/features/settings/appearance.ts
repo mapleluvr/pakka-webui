@@ -1,12 +1,27 @@
 import { useSyncExternalStore } from "react";
 
+export const palettes = [
+  { id: "neutral", name: "原色", description: "简洁黑白 · 随明暗切换" },
+  {
+    id: "pine",
+    name: "浅松 · 艾青",
+    description: "双色点缀 · 白字 · 固定配色",
+  },
+  { id: "plum", name: "乌梅 · 玉白", description: "乌梅紫与玉白 · 随明暗反转" },
+  { id: "jade", name: "黛青 · 月白", description: "黛青与月白 · 随明暗反转" },
+  { id: "blue", name: "霁蓝 · 茶白", description: "霁蓝底、茶白字 · 固定配色" },
+] as const;
+export type Palette = (typeof palettes)[number]["id"];
+
 export type Appearance = {
+  palette: Palette;
   mode: "system" | "light" | "dark";
   font: "system" | "serif" | "mono";
   size: 16 | 18 | 20 | 22 | 24;
 };
 const key = "pakka-webui-appearance-v1";
 export const defaultAppearance: Appearance = {
+  palette: "neutral",
   mode: "system",
   font: "system",
   size: 16,
@@ -29,7 +44,10 @@ function decode(raw: string | null): Appearance {
     const font =
       value.font === "serif" || value.font === "mono" ? value.font : "system";
     const size = textSizes.find((size) => size === value.size) ?? 16;
-    return { mode, font, size };
+    const palette =
+      palettes.find((item) => "palette" in value && item.id === value.palette)
+        ?.id ?? "neutral";
+    return { mode, font, size, palette };
   } catch {
     return defaultAppearance;
   }
@@ -43,7 +61,13 @@ function load() {
 }
 let state = load();
 const listeners = new Set<() => void>();
+export function appearanceMode(preferences: Appearance): Appearance["mode"] {
+  return preferences.palette === "pine" || preferences.palette === "blue"
+    ? "dark"
+    : preferences.mode;
+}
 function apply() {
+  document.documentElement.dataset.pakkaPalette = state.preferences.palette;
   document.documentElement.dataset.readingFont = state.preferences.font;
   document.documentElement.dataset.readingSize = String(state.preferences.size);
 }
