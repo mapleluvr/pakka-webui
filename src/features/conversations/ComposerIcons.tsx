@@ -9,6 +9,7 @@ export function ComposerIcon({
     | "close"
     | "search"
     | "history"
+    | "reset"
     | "width";
 }) {
   return (
@@ -49,6 +50,7 @@ export function ComposerIcon({
       {name === "history" && (
         <path d="M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v6l4 2" />
       )}
+      {name === "reset" && <path d="M4 4h16v16H4zM9 9h6v6H9z" />}
       {name === "width" && (
         <path d="M4 4v16M20 4v16M7 12h10m-7-3-3 3 3 3m4-6 3 3-3 3" />
       )}

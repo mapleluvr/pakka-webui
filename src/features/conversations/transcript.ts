@@ -54,7 +54,7 @@ export type ActivityGroup = Origin & {
   attention?: boolean;
   matchCount?: number;
   label: string;
-  running: boolean;
+  phase: "Done" | "Running" | "Failed" | "Stopped";
   failures: number;
   total: number;
 };
@@ -282,7 +282,7 @@ function activityGroup(origin: Origin, items: ActivityItem[]): ActivityGroup {
     key: `activity/${origin.key}`,
     items,
     label: "",
-    running: false,
+    phase: "Done",
     failures: 0,
     total: 0,
   };
@@ -317,14 +317,13 @@ function summarize(row: ActivityGroup, active: boolean, liveThinking: boolean) {
   const toolErrors = calls.filter((x) => x.tool.result?.isError).length;
   const last = row.items.at(-1);
   const terminal = last?.kind === "replyIssue" ? last.issue : undefined;
-  row.running = active && !terminal?.stopped;
+  const running = active && !terminal?.stopped;
   row.attention = toolErrors + modelErrors > 0;
   row.failures = toolErrors;
   row.total = row.items.length;
-  let phase = "Done";
-  if (row.running) phase = "Running";
-  else if (terminal?.stopped) phase = "Stopped";
-  else if (terminal) phase = "Failed";
+  if (running) row.phase = "Running";
+  else if (terminal?.stopped) row.phase = "Stopped";
+  else if (terminal) row.phase = "Failed";
   const counts: string[] = [];
   for (const [n, label] of [
     [calls.length, "tool call"],
@@ -333,9 +332,9 @@ function summarize(row: ActivityGroup, active: boolean, liveThinking: boolean) {
     [modelErrors, "model error"],
   ] as const)
     if (n) counts.push(`${n} ${label}${n === 1 ? "" : "s"}`);
-  if (row.running)
+  if (running)
     counts.push(latestError(row.items) ?? activeAction(calls, liveThinking));
-  row.label = `${phase} (${counts.join(", ")})`;
+  row.label = `${row.phase} (${counts.join(", ")})`;
 }
 function latestError(items: ActivityItem[]) {
   // Result order (parallel tools may finish in reverse), never declaration order.

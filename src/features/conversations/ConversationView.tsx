@@ -1,3 +1,5 @@
+import { NotebookTool } from "./notebook/NotebookTool.js";
+import type { EntryRef, SourceAction } from "./notebook/source-actions.js";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ConversationInputHistory } from "@pakka/protocol/webui";
 import type { AgentRef } from "@pakka/protocol/pocket";
@@ -5,6 +7,7 @@ import { Button } from "@astryxdesign/core/Button";
 import type { UiViewProps } from "@pakka/webui-sdk";
 import { conversationReference } from "../../integrations/pakka/resources.js";
 import type { PakkaConnection } from "../../integrations/pakka/connection.js";
+import { ConversationPanelHost } from "./ConversationPanel.js";
 import { HistoryBody } from "./HistoryBody.js";
 import { ReadingIcon } from "./ReadingIcons.js";
 import { ReadingState } from "./ReadingState.js";
@@ -13,6 +16,7 @@ import { useConversationName } from "./useConversationName.js";
 import { Composer } from "./Composer.js";
 import { InputActivity } from "./InputActivity.js";
 import { ForkConversation } from "./ForkConversation.js";
+import { usePeopleSettings } from "../identity/usePeopleSettings.js";
 import { Collaboration } from "./Collaboration.js";
 import { ReadingWidth, useReadingWidth } from "./ReadingWidth.js";
 import { MoreIcon } from "./ReadingIcons.js";
@@ -47,6 +51,12 @@ export function ConversationView({
   );
   const [stopTarget, setStopTarget] = useState<HTMLDivElement | null>(null);
   const [searchTarget, setSearchTarget] = useState<HTMLDivElement | null>(null);
+  const personal = usePeopleSettings(bindings).mode === "personal";
+  const sourceAction = useRef<SourceAction>(null);
+  const [located, setLocated] = useState<EntryRef | null>(null),
+    [locationError, setLocationError] = useState("");
+  const locationRead = useRef<AbortController | null>(null);
+  useEffect(() => () => locationRead.current?.abort(), [ui, bindings]);
   const readingWidth = useReadingWidth();
   const reference = useMemo(() => conversationReference(ui.resource), [ui]);
   const [before, setBefore] = useState<string | undefined>();
@@ -54,8 +64,8 @@ export function ConversationView({
   const [refresh, setRefresh] = useState(0);
   const [followRevision, setFollowRevision] = useState(0);
   const [forkEntry, setForkEntry] = useState<string | null>(null);
-  const scroll = useRef<HTMLDivElement>(null);
-  const [readingControls, setReadingControls] = useState<HTMLDivElement | null>(
+  const scroll = useRef<HTMLElement>(null);
+  const [readingControls, setReadingControls] = useState<HTMLElement | null>(
     null,
   );
   const { resolution, history, error, loading, observation } =
@@ -75,13 +85,65 @@ export function ConversationView({
     if (!ui.signal.aborted && !bindings.signal.aborted) onTitle?.(title);
   }, [title, onTitle, ui.signal, bindings.signal]);
   const page = history?.status === "loaded" ? history.snapshot : history?.page;
+  async function locate(source: EntryRef) {
+    locationRead.current?.abort();
+    const c = new AbortController();
+    locationRead.current = c;
+    const signal = AbortSignal.any([ui.signal, bindings.signal, c.signal]);
+    setLocationError("");
+    setLocated(null);
+    try {
+      await bindings.services.request(
+        {
+          op: "resource.content",
+          reference,
+          content: source.content,
+          range: { offset: 0, length: 8 },
+        },
+        { signal },
+      );
+      if (!page?.entries.some((e) => e.id === source.content.entryId)) {
+        let boundary: string | undefined;
+        for (;;) {
+          const { history: h } = await bindings.services.request(
+            {
+              op: "resource.history",
+              reference,
+              options: {
+                limit: 32,
+                maxBytes: 131072,
+                ...(boundary ? { beforeEntryId: boundary } : {}),
+              },
+            },
+            { signal },
+          );
+          const p = h.status === "loaded" ? h.snapshot : h.page;
+          if (p.entries.some((e) => e.id === source.content.entryId)) {
+            setBefore(boundary);
+            break;
+          }
+          if (
+            !p.entriesTruncated ||
+            !p.olderBeforeId ||
+            p.olderBeforeId === boundary
+          )
+            throw Error("原内容暂不可用");
+          boundary = p.olderBeforeId;
+        }
+      }
+      signal.throwIfAborted();
+      setLocated(source);
+    } catch {
+      if (!signal.aborted) setLocationError("原内容暂不可用");
+    }
+  }
   const running = history?.status === "loaded" && history.snapshot.live.busy;
   const status = history?.status ?? resolution?.status;
   let stateText = "正在核对原资源…";
   if (status === "loaded") stateText = observationLabels[observation];
   else if (status) stateText = resolutionLabels[status];
   return (
-    <section className="conversation-view" style={readingWidth.style}>
+    <ConversationPanelHost style={readingWidth.style}>
       <header className="conversation-heading">
         <div className="conversation-title">
           <h1>{title}</h1>
@@ -117,6 +179,17 @@ export function ConversationView({
             />
           )}
 
+          {resolution?.status === "loaded" && (
+            <NotebookTool
+              key={JSON.stringify(reference)}
+              title={title}
+              ref={sourceAction}
+              ui={ui}
+              connection={bindings}
+              target={resolution.target}
+              locate={(r) => void locate(r)}
+            />
+          )}
           <div
             ref={setSettingsTarget}
             className="conversation-settings-control"
@@ -148,24 +221,26 @@ export function ConversationView({
           </details>
         </div>
       </header>
-      <div
+      <section
         ref={scroll}
         className="conversation-reading"
         tabIndex={0}
-        role="region"
         aria-label="Conversation 阅读区"
       >
         <div className="conversation-reading-column">
           {resolution?.status === "loaded" && (
             <div className="conversation-tools">
-              <Collaboration
-                ui={ui}
-                connection={bindings}
-                target={resolution.target}
-              />
+              {!personal && (
+                <Collaboration
+                  ui={ui}
+                  connection={bindings}
+                  target={resolution.target}
+                />
+              )}
               {contributions?.(resolution.target)}
             </div>
           )}
+          {locationError && <p role="alert">{locationError}</p>}
           {error && (
             <p role="alert" className="error-text">
               {error}
@@ -215,6 +290,13 @@ export function ConversationView({
                   scroll={scroll}
                   controls={readingControls}
                   searchTarget={searchTarget}
+                  onSource={
+                    resolution?.status === "loaded"
+                      ? (mode, r, text) => sourceAction.current?.(mode, r, text)
+                      : undefined
+                  }
+                  located={located}
+                  clearLocated={() => setLocated(null)}
                   entries={page.entries}
                   inputs={resolution?.status === "loaded" ? inputs : null}
                   processingLive={
@@ -266,12 +348,11 @@ export function ConversationView({
             )}
           </ReadingState>
         </div>
-      </div>
+      </section>
       <div className="conversation-reading-controls">
-        <div
+        <nav
           ref={setReadingControls}
           className="conversation-follow-controls"
-          role="navigation"
           aria-label="本页阅读导航"
         />
       </div>
@@ -295,6 +376,6 @@ export function ConversationView({
           </div>
         </footer>
       )}
-    </section>
+    </ConversationPanelHost>
   );
 }

@@ -1,3 +1,4 @@
+import { usePeopleSettings } from "../identity/usePeopleSettings.js";
 import {
   useCallback,
   useEffect,
@@ -58,6 +59,7 @@ export function NotificationSettingsView({
   ui,
   bindings: connection,
 }: UiViewProps<PakkaConnection>) {
+  const personal = usePeopleSettings(connection).mode === "personal";
   const [listing, setListing] = useState<Listing | null>(null);
   const [target, setTarget] = useState<AgentRef | null>(null);
   const [status, setStatus] = useState<NotificationStatus | null>(null);
@@ -382,24 +384,29 @@ export function NotificationSettingsView({
                 这些选择应用于你的已登记资源，不改变其他人员的偏好。
               </p>
               <div className="notification-options">
-                {kinds.map(([kind, label]) => (
-                  <label className="notification-option" key={kind}>
-                    <input
-                      type="checkbox"
-                      checked={draft[kind]}
-                      disabled={changes.preferencesBlocked()}
-                      onChange={(event) => {
-                        dirty.current = true;
-                        setDraft((value) =>
-                          value
-                            ? { ...value, [kind]: event.target.checked }
-                            : value,
-                        );
-                      }}
-                    />
-                    {label}
-                  </label>
-                ))}
+                {kinds
+                  .filter(
+                    ([kind]) =>
+                      !personal || (kind !== "chat" && kind !== "mention"),
+                  )
+                  .map(([kind, label]) => (
+                    <label className="notification-option" key={kind}>
+                      <input
+                        type="checkbox"
+                        checked={draft[kind]}
+                        disabled={changes.preferencesBlocked()}
+                        onChange={(event) => {
+                          dirty.current = true;
+                          setDraft((value) =>
+                            value
+                              ? { ...value, [kind]: event.target.checked }
+                              : value,
+                          );
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
               </div>
               <Button
                 label="保存通知偏好"

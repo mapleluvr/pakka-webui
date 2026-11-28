@@ -417,12 +417,6 @@ button.directory-choice {
   overflow-wrap: anywhere;
   padding-inline: 12px;
 }
-.tool-card summary {
-  overflow-wrap: anywhere;
-}
-.tool-details {
-  padding-top: 12px;
-}
 .original-match {
   padding: 12px;
   border-inline-start: 3px solid var(--app-accent);

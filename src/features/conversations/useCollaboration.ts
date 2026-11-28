@@ -27,7 +27,10 @@ export function collaborationScope(action: CollaborationAction): string {
       ? JSON.stringify([action.kind, action.messageId])
       : JSON.stringify([action.kind]);
 }
-function records(connection: PakkaConnection, target: AgentRef) {
+export function collaborationRecords(
+  connection: PakkaConnection,
+  target: AgentRef,
+) {
   const base = [
     "pakka-collaboration",
     connection.origin,
@@ -77,7 +80,7 @@ export function hasCollaborationPending(
   target: AgentRef,
 ): boolean {
   try {
-    return records(connection, target).all().size > 0;
+    return collaborationRecords(connection, target).all().size > 0;
   } catch {
     return true;
   }
@@ -100,7 +103,7 @@ export function useCollaboration(
     [ui, connection, lifetime],
   );
   const storage = useMemo(
-    () => records(connection, target),
+    () => collaborationRecords(connection, target),
     [connection, target.sessionId, target.conversationId],
   );
   const [view, setView] = useState<CollaborationView | null>(null);
@@ -249,7 +252,12 @@ export function useCollaboration(
       state: "here" | "typing" | "away",
       ownSignal: AbortSignal,
     ) {
-      if (sending || ownSignal.aborted) return;
+      if (
+        sending ||
+        ownSignal.aborted ||
+        connection.peopleSettings.mode === "personal"
+      )
+        return;
       sending = true;
       try {
         await connection.workbench.request(
@@ -273,12 +281,13 @@ export function useCollaboration(
     return () => {
       clearInterval(interval);
       // Leaving is an ephemeral update; its result is never read into a closed panel.
-      void connection.workbench
-        .request(
-          { op: "collaboration.presence", target, input: { state: "away" } },
-          { signal: connection.signal },
-        )
-        .catch(() => {});
+      if (connection.peopleSettings.mode !== "personal")
+        void connection.workbench
+          .request(
+            { op: "collaboration.presence", target, input: { state: "away" } },
+            { signal: connection.signal },
+          )
+          .catch(() => {});
     };
   }, [signal, paused, visible, publishPresence]);
 
@@ -347,6 +356,7 @@ export function useCollaboration(
       return receipt;
     } catch (error) {
       if (
+        action &&
         original &&
         error instanceof PocketRemoteError &&
         error.outcome === "denied"
