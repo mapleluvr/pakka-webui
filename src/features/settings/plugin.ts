@@ -90,7 +90,7 @@ export function modelSettings(connection: PakkaConnection) {
     views: [
       {
         id: "defaults",
-        title: "个人模型默认",
+        title: "新对话默认模型",
         placement: "settings",
         navigation: true,
         render: ModelDefaultsView,

@@ -24,6 +24,118 @@
 :root[data-reading-font] [data-astryx-theme] {
   --font-family-body: var(--reading-font);
 }
+.palette-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.palette-picker legend {
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding: 0 0 14px;
+}
+.palette-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+}
+.palette-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 14px;
+  background: var(--app-surface);
+  cursor: pointer;
+}
+.palette-option:has(input:checked) {
+  border-color: var(--app-accent);
+  box-shadow: inset 0 0 0 1px var(--app-accent);
+}
+.palette-option:has(input:focus-visible) {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
+}
+.palette-option input {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--app-accent);
+}
+.palette-name {
+  padding-right: 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.palette-description {
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+.palette-swatch {
+  --swatch-ink: #202020;
+  --swatch-paper: #f3f3f3;
+  display: flex;
+  overflow: hidden;
+  height: 72px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+}
+.palette-swatch[data-palette="plum"] {
+  --swatch-ink: #4e2a3a;
+  --swatch-paper: #e9e4d5;
+}
+.palette-swatch[data-palette="jade"] {
+  --swatch-ink: #243836;
+  --swatch-paper: #e7ece8;
+}
+.palette-swatch[data-palette="blue"] {
+  --swatch-ink: #2f5d8a;
+  --swatch-paper: #fff4e3;
+}
+.palette-swatch[data-palette="pine"] {
+  --swatch-ink: #244d3a;
+  --swatch-paper: #fff;
+}
+.palette-swatch > span {
+  display: grid;
+  place-items: center;
+  width: 50%;
+  font:
+    28px Georgia,
+    serif;
+  color: var(--swatch-ink);
+  background: var(--swatch-paper);
+}
+.palette-swatch > span + span,
+.palette-swatch:is([data-palette="blue"], [data-palette="pine"]) > span {
+  background: var(--swatch-ink);
+  color: var(--swatch-paper);
+}
+.palette-swatch[data-palette="pine"] {
+  border-top: 5px solid #ffc44f;
+  border-bottom: 5px solid #5ecd8c;
+}
+.palette-swatch[data-palette="pine"] > span + span {
+  background: #326749;
+}
+@media (max-width: 640px) {
+  .palette-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .palette-swatch {
+    height: 56px;
+  }
+  .palette-name {
+    padding-right: 0;
+    font-size: 0.85rem;
+  }
+}
 .appearance-preview pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

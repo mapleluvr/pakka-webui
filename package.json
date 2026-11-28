@@ -37,8 +37,8 @@
   "devDependencies": {
     "@astryxdesign/core": "0.7.15",
     "@astryxdesign/theme-neutral": "0.7.15",
-    "@pakka/client": "file:vendor/pakka-client-63d811926effaaea.tgz",
-    "@pakka/protocol": "file:vendor/pakka-protocol-af43f2e9e3cde3df.tgz",
+    "@pakka/client": "file:vendor/pakka-client-e953a39e8c1794a8.tgz",
+    "@pakka/protocol": "file:vendor/pakka-protocol-855d380de36315be.tgz",
     "@stylexjs/stylex": "0.19.2",
     "@tanstack/react-virtual": "3.13.12",
     "@types/react": "19.3.0",

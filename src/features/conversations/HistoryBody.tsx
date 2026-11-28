@@ -1,4 +1,6 @@
 import { useLayoutEffect, useMemo, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import { ComposerIcon } from "./ComposerIcons.js";
 import type { ConversationInputHistory } from "@pakka/protocol/webui";
 import {
   inlineInputStatus,
@@ -25,12 +27,14 @@ export function HistoryBody({
   onFork,
   scroll,
   controls,
+  searchTarget,
   followRevision,
   ...bindings
 }: ContentBindings & {
   followRevision: number;
   scroll: RefObject<HTMLDivElement | null>;
   controls?: HTMLElement | null;
+  searchTarget?: HTMLElement | null;
   entries: PocketSnapshot["entries"];
   inputs: ConversationInputHistory | null;
   processingLive: boolean;
@@ -38,6 +42,7 @@ export function HistoryBody({
   onFork?(entryId: string): void;
 }) {
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   useLayoutEffect(() => {
     if (followRevision > 0) setQuery("");
   }, [followRevision]);
@@ -58,7 +63,24 @@ export function HistoryBody({
   const selected = useMemo(() => matchRows(rows, query), [rows, query]);
   return (
     <div className="transcript">
-      {rows.length > 0 && (
+      {searchTarget &&
+        createPortal(
+          <button
+            type="button"
+            className="reader-action"
+            aria-label="搜索本页预览"
+            title="搜索本页预览"
+            aria-expanded={searchOpen}
+            onClick={() => {
+              setSearchOpen((value) => !value);
+              if (searchOpen) setQuery("");
+            }}
+          >
+            <ComposerIcon name="search" />
+          </button>,
+          searchTarget,
+        )}
+      {rows.length > 0 && (searchOpen || !searchTarget) && (
         <div className="history-search">
           <TextInput
             label="搜索本页预览"

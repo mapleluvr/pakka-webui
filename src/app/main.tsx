@@ -12,7 +12,6 @@ import {
   type ViewTarget,
 } from "@pakka/webui-sdk";
 import { createUiRegistry, type UiRegistry } from "../host/registry.js";
-import { playground } from "../plugins/playground.js";
 import {
   modelSettings,
   sessionSettings,
@@ -93,11 +92,11 @@ const peopleSettings = defineUiPlugin<PakkaConnection>({
   runtime: "react19-astryx0.7.15",
   id: "people-settings",
   version: "0.1.0",
-  title: "人员与邀请",
+  title: "设备与访问",
   views: [
     {
       id: "people",
-      title: "人员与邀请",
+      title: "设备与访问",
       placement: "settings",
       navigation: true,
       render: PeopleView,
@@ -168,11 +167,6 @@ function Root() {
     });
     host.publish({
       plugin: appearanceSettings,
-      generation: "bundled-0.1.0",
-      bindings: undefined,
-    });
-    host.publish({
-      plugin: playground,
       generation: "bundled-0.1.0",
       bindings: undefined,
     });

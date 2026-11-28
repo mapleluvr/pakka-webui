@@ -141,18 +141,14 @@ p {
 }
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
+  min-height: 44px;
+  border-radius: 8px;
   text-decoration: none;
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.035em;
-}
-.brand-caption {
-  font-size: 0.75rem;
-  font-weight: 450;
-  letter-spacing: normal;
-  color: var(--app-muted);
 }
 .nav-list {
   display: flex;
@@ -474,15 +470,10 @@ summary {
   background: var(--color-background-muted);
   color: var(--app-accent);
 }
-.page,
-.welcome {
+.page {
   padding: 28px clamp(20px, 5vw, 76px) 64px;
   max-width: 1280px;
   margin: auto;
-}
-.welcome {
-  padding-top: clamp(60px, 18vh, 180px);
-  max-width: 880px;
 }
 .form-grid {
   display: grid;
@@ -669,9 +660,6 @@ summary {
   }
   .surface {
     padding: 18px;
-  }
-  .welcome {
-    padding: 48px 20px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

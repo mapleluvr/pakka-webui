@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ComposerIcon } from "./ComposerIcons.js";
 import { Dictation } from "./Dictation.js";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { CloseIcon } from "../../host/InstanceView.js";
@@ -39,7 +41,11 @@ export function Composer({
   onSubmitted,
   disabled,
   running,
+  settingsTarget,
+  stopTarget,
 }: {
+  settingsTarget: HTMLElement | null;
+  stopTarget(element: HTMLDivElement | null): void;
   ui: UiContext;
   connection: PakkaConnection;
   target: AgentRef;
@@ -63,6 +69,8 @@ export function Composer({
       : "prompt",
   );
   const [picker, setPicker] = useState<"model" | "thinking" | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [multiline, setMultiline] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const commandPending = useRef(false);
@@ -111,7 +119,7 @@ export function Composer({
       closePicker();
     }
   }
-  async function submit() {
+  async function submit(selectedMode: InputMode = mode) {
     if (
       draft.trim() === "/model" &&
       !delivery.pending &&
@@ -188,17 +196,98 @@ export function Composer({
         if (alive()) setResolving(false);
       }
     }
-    if (await delivery.submit(config.currentTarget(), draft, mode)) {
+    if (await delivery.submit(config.currentTarget(), draft, selectedMode)) {
       setDraft((current) => (current === draft ? "" : current));
       onSubmitted?.();
     }
   }
+  useLayoutEffect(() => {
+    const element = input.current;
+    if (!element) return;
+    // Measure wrapping at the compact width so expanding cannot make the
+    // same text collapse again on the next ResizeObserver callback.
+    const probe = element.cloneNode() as HTMLTextAreaElement;
+    probe.removeAttribute("id");
+    probe.setAttribute("aria-hidden", "true");
+    probe.tabIndex = -1;
+    probe.disabled = true;
+    Object.assign(probe.style, {
+      position: "absolute",
+      visibility: "hidden",
+      pointerEvents: "none",
+      height: "0px",
+      minHeight: "0px",
+      overflow: "hidden",
+    });
+    element.parentElement?.append(probe);
+    const update = () => {
+      const width = element.clientWidth;
+      if (!width) return;
+      const form = element.closest("form")!;
+      const actions = form.querySelector(".composer-actions")!;
+      const compactWidth = matchMedia("(max-width: 700px)").matches
+        ? width
+        : Math.max(
+            80,
+            form.clientWidth -
+              24 -
+              44 -
+              8 -
+              actions.getBoundingClientRect().width,
+          );
+      probe.style.width = compactWidth + "px";
+      probe.value = draft;
+      const style = getComputedStyle(element);
+      const singleLine =
+        parseFloat(style.lineHeight) +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom);
+      setMultiline(probe.scrollHeight > singleLine + 1 || draft.includes("\n"));
+      element.style.height = "0px";
+      element.style.height =
+        Math.min(element.scrollHeight, Math.min(240, innerHeight * 0.28)) +
+        "px";
+    };
+    update();
+    let lastWidth = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (lastWidth !== element.clientWidth) {
+        lastWidth = element.clientWidth;
+        update();
+      }
+    });
+    observer.observe(element);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      probe.remove();
+      window.removeEventListener("resize", update);
+    };
+  }, [draft, expanded]);
+  const cannotSend =
+    busy ||
+    !!config.unconfirmed ||
+    !draft.trim() ||
+    !!delivery.pending ||
+    !!extensionCommand.pending;
   const modelLabel = config.configuration?.current?.model ?? "选择模型";
   const levelLabel = config.model?.thinkingLevels.length
     ? (config.configuration?.current?.thinkingLevel ?? "默认")
     : "不支持";
   return (
-    <section className="composer surface flow" aria-label="Conversation 输入">
+    <section className="composer flow" aria-label="Conversation 输入">
+      {settingsTarget &&
+        createPortal(
+          <ConversationSettings
+            compact
+            ui={ui}
+            connection={connection}
+            config={config}
+            disabled={busy}
+            running={running}
+          />,
+          settingsTarget,
+        )}
       {config.unconfirmed && (
         <div role="status" className="flow compact">
           <p className="identifier">
@@ -217,52 +306,100 @@ export function Composer({
         </div>
       )}
       <form
-        className="flow compact"
+        className="floating-composer"
+        data-multiline={multiline || undefined}
+        data-running={running || undefined}
         onSubmit={(event) => {
           if (event.target !== event.currentTarget) return;
           event.preventDefault();
-          void submit();
+          if (!running) void submit();
         }}
       >
-        <TextArea
-          ref={input}
-          label="消息或命令"
-          isLabelHidden
-          value={draft}
-          onChange={setDraft}
-          rows={2}
-          placeholder="Where all miracles begin."
-          autoComplete="off"
-          controlClassName="composer-input"
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.ctrlKey &&
-              !event.metaKey &&
-              !event.altKey &&
-              !event.repeat &&
-              !event.nativeEvent.isComposing &&
-              event.nativeEvent.keyCode !== 229
-            ) {
-              event.preventDefault();
-              void submit();
-            }
-          }}
-        />
+        <div className="composer-mode">
+          <MoreMenu
+            label={`输入方式：${inputModeLabel[mode]}`}
+            alignment="start"
+            placement="above"
+            icon={<ComposerIcon name="plus" />}
+            items={[
+              ...(["prompt", "steer", "followUp"] as const).map((value) => ({
+                label: inputModeLabel[value],
+                description: inputModeDescription[value],
+                onClick: () => setMode(value),
+              })),
+              ...(running
+                ? [
+                    {
+                      label: "以 Steering 发送当前草稿",
+                      description: "在下一次可介入时调整当前工作",
+                      isDisabled: cannotSend,
+                      onClick: () => {
+                        void submit("steer");
+                      },
+                    },
+                    {
+                      label: "以 Follow-up 发送当前草稿",
+                      description: "等待当前这轮结束后执行",
+                      isDisabled: cannotSend,
+                      onClick: () => {
+                        void submit("followUp");
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {mode !== "prompt" && (
+            <span className="composer-mode-mark" aria-hidden="true">
+              {mode === "steer" ? "S" : "F"}
+            </span>
+          )}
+        </div>
+        <div className="composer-draft">
+          <textarea
+            ref={input}
+            aria-label="消息或命令"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            rows={1}
+            placeholder="Where all miracles begin."
+            autoComplete="off"
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey &&
+                !event.repeat &&
+                !event.nativeEvent.isComposing &&
+                event.nativeEvent.keyCode !== 229
+              ) {
+                event.preventDefault();
+                if (!running || mode !== "prompt") void submit();
+              }
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="composer-expand reader-action"
+          aria-label="展开编辑"
+          title="展开编辑"
+          onClick={() => setExpanded(true)}
+        >
+          <ComposerIcon name="expand" />
+        </button>
         <div className="composer-actions">
-          <div className="actions model-controls">
+          <div className="composer-model-group">
             <button
               type="button"
               className="toolbar-choice composer-model-control"
               onClick={() => setPicker("model")}
-              aria-label={modelLabel}
+              aria-label={`选择模型：${modelLabel}`}
               title={modelLabel}
             >
-              <span className="choice-wide">{modelLabel}</span>
-              <span className="choice-short">
-                {modelLabel.slice(modelLabel.indexOf("/") + 1)}
-              </span>
+              {modelLabel.slice(modelLabel.indexOf("/") + 1)}
             </button>
             <button
               type="button"
@@ -272,17 +409,10 @@ export function Composer({
               aria-label={`Thinking · ${levelLabel}`}
               title={`Thinking · ${levelLabel}`}
             >
-              <span className="choice-wide">Thinking · </span>
               {levelLabel}
             </button>
-            <ConversationSettings
-              compact
-              ui={ui}
-              connection={connection}
-              config={config}
-              disabled={busy}
-              running={running}
-            />
+          </div>
+          {!running && (
             <Dictation
               compact
               key={JSON.stringify(config.currentTarget())}
@@ -292,51 +422,64 @@ export function Composer({
                 !busy &&
                 !config.unconfirmed &&
                 !delivery.pending &&
-                !extensionCommand.pending
+                !extensionCommand.pending &&
+                !expanded
               }
               onText={setDraft}
             />
-          </div>
-          <div className="send-cluster">
-            <MoreMenu
-              label={`输入方式：${inputModeLabel[mode]}`}
-              alignment="end"
-              placement="above"
-              icon={
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  aria-hidden="true"
-                >
-                  <path d="m7 10 5 5 5-5" />
-                </svg>
-              }
-              items={(["prompt", "steer", "followUp"] as const).map(
-                (value) => ({
-                  label: inputModeLabel[value],
-                  description: inputModeDescription[value],
-                  onClick: () => setMode(value),
-                }),
-              )}
-            />
-            <Button
-              label={busy ? "正在处理…" : sendLabel[mode]}
-              type="submit"
-              isDisabled={
-                busy ||
-                config.unconfirmed ||
-                !draft.trim() ||
-                !!delivery.pending ||
-                !!extensionCommand.pending
-              }
-            />
+          )}
+          <div className="composer-primary-slot" ref={stopTarget}>
+            {!running && !!draft.trim() && (
+              <button
+                type="submit"
+                className="composer-primary"
+                aria-label={sendLabel[mode]}
+                title={sendLabel[mode]}
+                disabled={cannotSend}
+              >
+                <ComposerIcon name="send" />
+              </button>
+            )}
           </div>
         </div>
       </form>
+      <Dialog
+        isOpen={expanded}
+        onOpenChange={setExpanded}
+        aria-label="展开编辑消息"
+        width="min(960px, calc(100vw - 24px))"
+      >
+        <div className="dialog-content flow composer-editor">
+          <header className="pane-heading">
+            <h2>编辑消息</h2>
+            <button
+              className="reader-action"
+              type="button"
+              aria-label="收起编辑"
+              onClick={() => setExpanded(false)}
+            >
+              <ComposerIcon name="close" />
+            </button>
+          </header>
+          <TextArea
+            label="消息草稿"
+            isLabelHidden
+            value={draft}
+            onChange={setDraft}
+            rows={14}
+            placeholder="Where all miracles begin."
+          />
+          <div className="actions">
+            <Button
+              label="完成编辑"
+              onClick={() => {
+                setExpanded(false);
+                input.current?.focus();
+              }}
+            />
+          </div>
+        </div>
+      </Dialog>
       {(error ?? config.error ?? delivery.error ?? extensionCommand.error) && (
         <p role="alert" className="error-text">
           {error ?? config.error ?? delivery.error ?? extensionCommand.error}

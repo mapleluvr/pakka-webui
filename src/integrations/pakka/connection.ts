@@ -1,3 +1,4 @@
+import type { PeopleSettings } from "@pakka/protocol/webui";
 import { POCKET_VERSION } from "@pakka/protocol/pocket";
 import {
   createPocketClient,
@@ -24,6 +25,9 @@ export interface PakkaConnection {
   readonly workbench: PocketClient;
   readonly services: WebUiServiceClient;
   readonly extensions: ExtensionClient;
+  readonly peopleSettings: PeopleSettings;
+  refreshPeopleSettings(): Promise<PeopleSettings>;
+  subscribePeopleSettings(listener: () => void): () => void;
 }
 
 function csrf(): string | null {
@@ -95,7 +99,48 @@ export async function connectPakka(
     request: (command, options) =>
       guarded(() => services.request(command, options)),
   };
+  let peopleSettings = (
+    await services.request({ op: "people.settings" }, { signal })
+  ).settings;
+  signal.throwIfAborted();
+  const settingsListeners = new Set<() => void>();
+  async function refreshPeopleSettings() {
+    const result = await guarded(() =>
+      services.request({ op: "people.settings" }, { signal }),
+    );
+    signal.throwIfAborted();
+    if (result.settings.version >= peopleSettings.version) {
+      peopleSettings = result.settings;
+      settingsListeners.forEach((listener) => listener());
+    }
+    return peopleSettings;
+  }
+  const refreshMode = () => {
+    if (!signal.aborted && document.visibilityState === "visible")
+      void refreshPeopleSettings().catch(() => {});
+  };
+  const modeTimer = window.setInterval(refreshMode, 30000);
+  window.addEventListener("focus", refreshMode);
+  signal.addEventListener(
+    "abort",
+    () => {
+      window.clearInterval(modeTimer);
+      window.removeEventListener("focus", refreshMode);
+      settingsListeners.clear();
+    },
+    { once: true },
+  );
   return Object.freeze<PakkaConnection>({
+    get peopleSettings() {
+      return peopleSettings;
+    },
+    refreshPeopleSettings,
+    subscribePeopleSettings(listener) {
+      settingsListeners.add(listener);
+      return () => {
+        settingsListeners.delete(listener);
+      };
+    },
     identity: JSON.stringify([hello.serverId, hello.person.id]),
     origin,
     person: hello.person,

@@ -333,7 +333,7 @@ export function SessionBudgetPolicy({
             />
           ))}
           <TextInput
-            label="修改原因"
+            label="备注（可选）"
             value={draft.reason}
             onChange={(reason) => setDraft({ ...draft, reason })}
             isDisabled={blocked}
@@ -341,19 +341,15 @@ export function SessionBudgetPolicy({
             controlClassName="touch-control"
           />
           <div>
-            <Button
-              label="保存预算"
-              type="submit"
-              isDisabled={blocked || !draft.reason.trim()}
-            />
+            <Button label="保存预算" type="submit" isDisabled={blocked} />
           </div>
         </form>
       )}
       {receipt && (
-        <p className="muted">
-          最近确认的原请求：
+        <details>
+          <summary>最近保存详情</summary>
           <code className="resource-id">{receipt.requestId}</code>
-        </p>
+        </details>
       )}
       {page && (
         <section className="surface flow" aria-label="预算修改记录">
@@ -363,24 +359,32 @@ export function SessionBudgetPolicy({
             {page.items.map((row) => (
               <li key={row.version}>
                 <div className="flow">
-                  <strong>
-                    版本 {row.version}
-                    {" · "}
-                    {row.source === "bootstrap" ? "启动配置" : "管理修改"}
-                  </strong>
-                  <p>{row.reason}</p>
-                  <p className="muted">
-                    {new Date(row.at).toLocaleString()} · {row.actorId}
-                  </p>
+                  <strong>{new Date(row.at).toLocaleString()}</strong>
+                  {row.reason && <p>{row.reason}</p>}
                   <p>
-                    Conversation：{displayLimit(row.after.maxConversations)}
-                    ；主要推理：{displayLimit(row.after.maxPrimaryAttempts)}
-                    ；辅助推理：{displayLimit(row.after.maxAuxiliaryAttempts)}。
+                    Conversation：{displayLimit(row.before.maxConversations)} →{" "}
+                    {displayLimit(row.after.maxConversations)}
+                    ；主要推理：{displayLimit(
+                      row.before.maxPrimaryAttempts,
+                    )} → {displayLimit(row.after.maxPrimaryAttempts)}
+                    ；辅助推理：{displayLimit(
+                      row.before.maxAuxiliaryAttempts,
+                    )}{" "}
+                    → {displayLimit(row.after.maxAuxiliaryAttempts)}。
                   </p>
-                  <p className="muted">
-                    当时已消耗：主要 {row.budget.primaryAttempts} 次，辅助{" "}
-                    {row.budget.auxiliaryAttempts} 次。
-                  </p>
+                  <details>
+                    <summary>记录详情</summary>
+                    <p className="muted">
+                      版本 {row.version} ·{" "}
+                      {row.source === "bootstrap" ? "启动配置" : "管理修改"} ·
+                      操作者 {row.actorId}
+                    </p>
+                    <p className="identifier">请求 {row.requestId}</p>
+                    <p className="muted">
+                      当时已消耗：主要 {row.budget.primaryAttempts} 次，辅助{" "}
+                      {row.budget.auxiliaryAttempts} 次。
+                    </p>
+                  </details>
                 </div>
               </li>
             ))}

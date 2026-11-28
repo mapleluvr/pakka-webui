@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { createPortal } from "react-dom";
+import { ComposerIcon } from "./ComposerIcons.js";
 import { PocketRemoteError, type AgentRef } from "@pakka/client/pocket";
 import { decodeTarget } from "@pakka/protocol/extension-rpc";
 import type { ConversationInputHistory } from "@pakka/protocol/webui";
@@ -53,7 +56,9 @@ export function InputActivity({
   page,
   setPage,
   disabled,
+  stopTarget,
 }: {
+  stopTarget: HTMLElement | null;
   ui: UiContext;
   connection: PakkaConnection;
   target: AgentRef;
@@ -82,8 +87,8 @@ export function InputActivity({
   const [expanded, setExpanded] = useState(() => pending !== null);
   const detailsId = useId();
   useEffect(() => {
-    if (pending || error || notice) setExpanded(true);
-  }, [pending, error, notice]);
+    if (!busy && (pending || error)) setExpanded(true);
+  }, [pending, error, busy]);
   const admission = useRef(false);
   const alive = () => !ui.signal.aborted && !connection.signal.aborted;
   useEffect(() => {
@@ -258,6 +263,28 @@ export function InputActivity({
   }
   return (
     <section className="input-activity" aria-label="我的输入回执">
+      {running &&
+        stopTarget &&
+        createPortal(
+          <button
+            type="button"
+            className="composer-primary"
+            aria-label="停止当前工作"
+            title="停止当前工作"
+            disabled={
+              disabled ||
+              busy ||
+              !!pending ||
+              connection.person.role !== "admin"
+            }
+            onClick={() => {
+              void control("abort");
+            }}
+          >
+            <ComposerIcon name="stop" />
+          </button>,
+          stopTarget,
+        )}
       <header className="input-activity-bar">
         <button
           type="button"
@@ -266,17 +293,7 @@ export function InputActivity({
           aria-controls={detailsId}
           onClick={() => setExpanded((value) => !value)}
         >
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-          >
-            <path d={expanded ? "m4 10 4-4 4 4" : "m4 6 4 4 4-4"} />
-          </svg>
+          <ComposerIcon name="history" />
           <span>我的输入</span>
           <span className="input-summary-status">
             {pending
@@ -288,97 +305,102 @@ export function InputActivity({
                   : "当前清单暂无输入"}
           </span>
         </button>
-        <div className="actions">
-          <button
-            className="reader-action"
-            type="button"
-            disabled={reading || disabled}
-            onClick={() => setRefresh((value) => value + 1)}
-          >
-            <ReadingIcon name="refresh" />
-            刷新输入状态
-          </button>
-          {running && connection.person.role === "admin" && (
-            <Button
-              label="停止当前工作"
-              variant="ghost"
-              isDisabled={disabled || busy || !!pending}
-              onClick={() => {
-                void control("abort");
-              }}
-            />
-          )}
-        </div>
       </header>
-      <div
-        className="input-activity-body flow"
-        id={detailsId}
-        hidden={!expanded}
+      <Dialog
+        isOpen={expanded}
+        onOpenChange={setExpanded}
+        aria-label="我的输入"
+        width="min(640px, calc(100vw - 24px))"
       >
-        {error && (
-          <p role="alert" className="error-text">
-            {error}
-          </p>
-        )}
-        {notice && <p role="status">{notice}</p>}
-        {pending && (
-          <div className="flow compact">
-            <p>
-              {pending === "unreadable"
-                ? "本地控制记录不可读；请保留原记录。"
-                : `控制请求 ${pending.requestId} 尚未确认。`}
+        <div className="dialog-content input-activity-body flow" id={detailsId}>
+          <header className="pane-heading">
+            <h2>我的输入</h2>
+            <button
+              className="reader-action"
+              type="button"
+              aria-label="关闭我的输入"
+              onClick={() => setExpanded(false)}
+            >
+              <ComposerIcon name="close" />
+            </button>
+          </header>
+          <div className="actions">
+            <button
+              className="reader-action"
+              type="button"
+              disabled={reading || disabled}
+              onClick={() => setRefresh((value) => value + 1)}
+            >
+              <ReadingIcon name="refresh" />
+              刷新输入状态
+            </button>
+          </div>
+
+          {error && (
+            <p role="alert" className="error-text">
+              {error}
             </p>
+          )}
+          {notice && <p role="status">{notice}</p>}
+          {pending && (
+            <div className="flow compact">
+              <p>
+                {pending === "unreadable"
+                  ? "本地控制记录不可读；请保留原记录。"
+                  : `控制请求 ${pending.requestId} 尚未确认。`}
+              </p>
+              <Button
+                label="核对控制结果"
+                variant="ghost"
+                isDisabled={busy || pending === "unreadable" || disabled}
+                onClick={() => {
+                  void check();
+                }}
+              />
+            </div>
+          )}
+          {page && !page.items.length && (
+            <p className="muted">当前没有你的已接纳输入。</p>
+          )}
+          {page?.items.map((item) => (
+            <article className="flow compact" key={item.receipt.id}>
+              <header>
+                {inputModeLabel[item.mode]} · {inputStatus[item.receipt.status]}
+                {item.receipt.reason ? ` · ${item.receipt.reason}` : ""}
+              </header>
+              <p className="message-text">
+                {item.preview}
+                {item.truncated ? "（预览）" : ""}
+              </p>
+              {item.receipt.status === "queued" &&
+                connection.person.role !== "viewer" && (
+                  <Button
+                    label="撤回此输入"
+                    variant="ghost"
+                    isDisabled={disabled || busy || !!pending}
+                    onClick={() => {
+                      void control("withdraw", item.receipt.id);
+                    }}
+                  />
+                )}
+            </article>
+          ))}
+          <div className="actions">
             <Button
-              label="核对控制结果"
+              label="最近输入"
               variant="ghost"
-              isDisabled={busy || pending === "unreadable" || disabled}
-              onClick={() => {
-                void check();
-              }}
+              isDisabled={!cursor || reading}
+              onClick={() => setCursor(undefined)}
+            />
+            <Button
+              label="更早输入"
+              variant="ghost"
+              isDisabled={!page?.nextCursor || reading}
+              onClick={() => setCursor(page?.nextCursor)}
             />
           </div>
-        )}
-        {page && !page.items.length && (
-          <p className="muted">当前没有你的已接纳输入。</p>
-        )}
-        {page?.items.map((item) => (
-          <article className="flow compact" key={item.receipt.id}>
-            <header>
-              {inputModeLabel[item.mode]} · {inputStatus[item.receipt.status]}
-              {item.receipt.reason ? ` · ${item.receipt.reason}` : ""}
-            </header>
-            <p className="message-text">
-              {item.preview}
-              {item.truncated ? "（预览）" : ""}
-            </p>
-            {item.receipt.status === "queued" &&
-              connection.person.role !== "viewer" && (
-                <Button
-                  label="撤回此输入"
-                  variant="ghost"
-                  isDisabled={disabled || busy || !!pending}
-                  onClick={() => {
-                    void control("withdraw", item.receipt.id);
-                  }}
-                />
-              )}
-          </article>
-        ))}
-        <div className="actions">
-          <Button
-            label="最近输入"
-            variant="ghost"
-            isDisabled={!cursor || reading}
-            onClick={() => setCursor(undefined)}
-          />
-          <Button
-            label="更早输入"
-            variant="ghost"
-            isDisabled={!page?.nextCursor || reading}
-            onClick={() => setCursor(page?.nextCursor)}
-          />
         </div>
-      </div>
+      </Dialog>
     </section>
   );
 }

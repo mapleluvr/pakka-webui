@@ -22,6 +22,7 @@ import {
   hasCollaborationPending,
   useCollaboration,
 } from "./useCollaboration.js";
+import { usePeopleSettings } from "../identity/usePeopleSettings.js";
 import "./collaboration.css";
 
 interface NoteDraft {
@@ -113,6 +114,7 @@ export function Collaboration({
   connection: PakkaConnection;
   target: AgentRef;
 }) {
+  const personal = usePeopleSettings(connection).mode === "personal";
   const [open, setOpen] = useState(() =>
     hasCollaborationPending(connection, target),
   );
@@ -135,7 +137,7 @@ export function Collaboration({
       <div className="actions">
         <Button
           ref={entry}
-          label="人类协作"
+          label={personal ? "笔记与置顶" : "人类协作"}
           variant="ghost"
           aria-expanded={open}
           onClick={() => {
@@ -147,6 +149,7 @@ export function Collaboration({
       </div>
       {open && (
         <CollaborationPanel
+          personal={personal}
           ui={ui}
           connection={connection}
           target={target}
@@ -159,6 +162,7 @@ export function Collaboration({
   );
 }
 function CollaborationPanel({
+  personal,
   ui,
   connection,
   target,
@@ -170,10 +174,12 @@ function CollaborationPanel({
   connection: PakkaConnection;
   target: AgentRef;
   drafts: Drafts;
+  personal: boolean;
   setDrafts: Dispatch<SetStateAction<Drafts>>;
   close(): void;
 }) {
-  const shared = useCollaboration(ui, connection, target);
+  const shared = useCollaboration(ui, connection, target, !personal);
+  const [showChat, setShowChat] = useState(false);
   const [search, setSearch] = useState("");
   const [pinned, setPinned] = useState(false);
   const [page, setPage] = useState(0);
@@ -308,6 +314,7 @@ function CollaborationPanel({
   }
   const filtered = messages.filter(
     (message) =>
+      (!personal || showChat || message.pinned) &&
       (!pinned || message.pinned) &&
       (!search ||
         message.text.toLocaleLowerCase().includes(search.toLocaleLowerCase()) ||
@@ -326,13 +333,15 @@ function CollaborationPanel({
       ref={panel}
       tabIndex={-1}
       className="surface flow collaboration-panel"
-      aria-label="人类协作"
+      aria-label={personal ? "笔记与置顶" : "人类协作"}
     >
       <header className="feature-heading">
         <div className="flow compact">
-          <h2>人类协作</h2>
+          <h2>{personal ? "笔记与置顶" : "人类协作"}</h2>
           <p className="muted">
-            聊天与笔记供人类共享；模型输入使用下方 Conversation 输入框。
+            {personal
+              ? "笔记和置顶内容随对话保存，可在其他设备接着查看。"
+              : "聊天与笔记供人类共享；模型输入使用下方 Conversation 输入框。"}
           </p>
         </div>
         <Button label="关闭协作" variant="ghost" onClick={close} />
@@ -408,7 +417,7 @@ function CollaborationPanel({
           {receiptText(receipt)}
         </p>
       ))}
-      {shared.view && (
+      {shared.view && !personal && (
         <section
           className="collaboration-driver flow compact"
           aria-label="当前控制权"
@@ -520,9 +529,19 @@ function CollaborationPanel({
           </div>
         </section>
       )}
+      {personal && (
+        <CheckboxInput
+          label="显示人类聊天"
+          value={showChat}
+          onChange={setShowChat}
+        />
+      )}
       <div className="collaboration-columns">
-        <section className="flow" aria-label="人类聊天">
-          <h3>人类聊天</h3>
+        <section
+          className="flow"
+          aria-label={personal && !showChat ? "置顶内容" : "人类聊天"}
+        >
+          <h3>{personal && !showChat ? "置顶内容" : "人类聊天"}</h3>
           <div className="actions collaboration-filters">
             <TextInput
               label="搜索聊天"
@@ -580,56 +599,60 @@ function CollaborationPanel({
                       提及：{message.mentions.map(nameOf).join("、")}
                     </p>
                   )}
-                  <div className="collaboration-reactions">
-                    {reactions.map((reaction) => {
-                      const record = message.reactions.find(
-                          (item) => item.emoji === reaction.emoji,
-                        ),
-                        active =
-                          record?.people.includes(connection.person.id) ??
-                          false;
-                      const action: CollaborationAction = {
-                        kind: "react",
-                        messageId: message.id,
-                        emoji: reaction.emoji,
-                        active: !active,
-                      };
-                      return (
-                        <Button
-                          key={reaction.emoji}
-                          label={`${reaction.label} · ${record?.people.length ?? 0}`}
-                          variant="ghost"
-                          isIconOnly
-                          aria-pressed={active}
-                          isDisabled={locked(action)}
-                          icon={
-                            <span className="collaboration-reaction-icon">
-                              <ReactionIcon emoji={reaction.emoji} />
-                              <span className="collaboration-count">
-                                {record?.people.length ?? 0}
+                  {(!personal || showChat) && (
+                    <div className="collaboration-reactions">
+                      {reactions.map((reaction) => {
+                        const record = message.reactions.find(
+                            (item) => item.emoji === reaction.emoji,
+                          ),
+                          active =
+                            record?.people.includes(connection.person.id) ??
+                            false;
+                        const action: CollaborationAction = {
+                          kind: "react",
+                          messageId: message.id,
+                          emoji: reaction.emoji,
+                          active: !active,
+                        };
+                        return (
+                          <Button
+                            key={reaction.emoji}
+                            label={`${reaction.label} · ${record?.people.length ?? 0}`}
+                            variant="ghost"
+                            isIconOnly
+                            aria-pressed={active}
+                            isDisabled={locked(action)}
+                            icon={
+                              <span className="collaboration-reaction-icon">
+                                <ReactionIcon emoji={reaction.emoji} />
+                                <span className="collaboration-count">
+                                  {record?.people.length ?? 0}
+                                </span>
                               </span>
-                            </span>
-                          }
-                          onClick={() => {
-                            void shared.act(action);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
+                            }
+                            onClick={() => {
+                              void shared.act(action);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="actions">
-                    <Button
-                      label="引用消息"
-                      variant="ghost"
-                      isDisabled={!shared.view || !!postPending}
-                      onClick={() => {
-                        setDrafts((previous) => ({
-                          ...previous,
-                          quoteId: message.id,
-                        }));
-                        chatInput.current?.focus();
-                      }}
-                    />
+                    {(!personal || showChat) && (
+                      <Button
+                        label="引用消息"
+                        variant="ghost"
+                        isDisabled={!shared.view || !!postPending}
+                        onClick={() => {
+                          setDrafts((previous) => ({
+                            ...previous,
+                            quoteId: message.id,
+                          }));
+                          chatInput.current?.focus();
+                        }}
+                      />
+                    )}
                     {shared.view?.canPin && (
                       <Button
                         label={message.pinned ? "取消置顶" : "置顶消息"}
@@ -673,104 +696,106 @@ function CollaborationPanel({
               />
             </div>
           )}
-          <form
-            className="flow compact"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send();
-            }}
-          >
-            {drafts.quoteId && (
-              <div className="flow compact collaboration-quote">
-                <p>
-                  引用
-                  {quote
-                    ? ` ${quote.authorName}：${quote.text}`
-                    : "的原消息暂不在当前窗口"}
-                </p>
-                <Button
-                  label="取消引用"
-                  variant="ghost"
-                  onClick={() =>
-                    setDrafts((previous) => ({ ...previous, quoteId: null }))
+          {(!personal || showChat) && (
+            <form
+              className="flow compact"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send();
+              }}
+            >
+              {drafts.quoteId && (
+                <div className="flow compact collaboration-quote">
+                  <p>
+                    引用
+                    {quote
+                      ? ` ${quote.authorName}：${quote.text}`
+                      : "的原消息暂不在当前窗口"}
+                  </p>
+                  <Button
+                    label="取消引用"
+                    variant="ghost"
+                    onClick={() =>
+                      setDrafts((previous) => ({ ...previous, quoteId: null }))
+                    }
+                  />
+                </div>
+              )}
+              <TextArea
+                ref={chatInput}
+                label="发给人类的消息"
+                value={drafts.text}
+                rows={3}
+                autoComplete="off"
+                controlClassName="composer-input"
+                onChange={(text) => {
+                  setDrafts((previous) => ({ ...previous, text }));
+                  shared.typing();
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    (event.ctrlKey || event.metaKey) &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    void send();
                   }
-                />
-              </div>
-            )}
-            <TextArea
-              ref={chatInput}
-              label="发给人类的消息"
-              value={drafts.text}
-              rows={3}
-              autoComplete="off"
-              controlClassName="composer-input"
-              onChange={(text) => {
-                setDrafts((previous) => ({ ...previous, text }));
-                shared.typing();
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  (event.ctrlKey || event.metaKey) &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <div className="actions">
-              <Selector
-                label="提及成员"
-                options={[...names]
-                  .filter(([id]) => id !== connection.person.id)
-                  .map(([value, label]) => ({ value, label }))}
-                value=""
-                placeholder="选择成员…"
-                isDisabled={!shared.view || drafts.mentions.length >= 16}
-                presentation="adaptive"
-                controlClassName="touch-control"
-                onChange={(personId) => {
-                  if (!drafts.mentions.includes(personId))
-                    setDrafts((previous) => ({
-                      ...previous,
-                      mentions: [...previous.mentions, personId],
-                    }));
                 }}
               />
-              {drafts.mentions.map((personId) => (
+              <div className="actions">
+                <Selector
+                  label="提及成员"
+                  options={[...names]
+                    .filter(([id]) => id !== connection.person.id)
+                    .map(([value, label]) => ({ value, label }))}
+                  value=""
+                  placeholder="选择成员…"
+                  isDisabled={!shared.view || drafts.mentions.length >= 16}
+                  presentation="adaptive"
+                  controlClassName="touch-control"
+                  onChange={(personId) => {
+                    if (!drafts.mentions.includes(personId))
+                      setDrafts((previous) => ({
+                        ...previous,
+                        mentions: [...previous.mentions, personId],
+                      }));
+                  }}
+                />
+                {drafts.mentions.map((personId) => (
+                  <Button
+                    key={personId}
+                    label={`取消提及 ${nameOf(personId)}`}
+                    variant="ghost"
+                    onClick={() =>
+                      setDrafts((previous) => ({
+                        ...previous,
+                        mentions: previous.mentions.filter(
+                          (id) => id !== personId,
+                        ),
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+              <div className="actions">
                 <Button
-                  key={personId}
-                  label={`取消提及 ${nameOf(personId)}`}
-                  variant="ghost"
-                  onClick={() =>
-                    setDrafts((previous) => ({
-                      ...previous,
-                      mentions: previous.mentions.filter(
-                        (id) => id !== personId,
-                      ),
-                    }))
+                  label="发送聊天"
+                  type="submit"
+                  isLoading={shared.busyScopes.has(postScope)}
+                  isDisabled={
+                    !shared.view || !!shared.storageError || !!postPending
                   }
                 />
-              ))}
-            </div>
-            <div className="actions">
-              <Button
-                label="发送聊天"
-                type="submit"
-                isLoading={shared.busyScopes.has(postScope)}
-                isDisabled={
-                  !shared.view || !!shared.storageError || !!postPending
-                }
-              />
-              <span className="muted">Ctrl/⌘+Enter 发送</span>
-            </div>
-            {inputError && (
-              <p role="alert" className="error-text">
-                {inputError}
-              </p>
-            )}
-          </form>
+                <span className="muted">Ctrl/⌘+Enter 发送</span>
+              </div>
+              {inputError && (
+                <p role="alert" className="error-text">
+                  {inputError}
+                </p>
+              )}
+            </form>
+          )}
         </section>
         <section className="flow" aria-label="共享笔记">
           <h3>共享笔记{note ? ` · 当前版本 ${note.version}` : ""}</h3>

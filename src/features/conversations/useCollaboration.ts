@@ -88,6 +88,7 @@ export function useCollaboration(
   ui: UiContext,
   connection: PakkaConnection,
   target: AgentRef,
+  publishPresence = true,
 ) {
   const identity = JSON.stringify(target);
   const lifetime = useMemo(
@@ -242,7 +243,7 @@ export function useCollaboration(
   }, [signal, storage, paused, visible]);
 
   useEffect(() => {
-    if (signal.aborted || paused || !visible) return;
+    if (signal.aborted || paused || !visible || !publishPresence) return;
     let sending = false;
     async function publish(
       state: "here" | "typing" | "away",
@@ -279,7 +280,7 @@ export function useCollaboration(
         )
         .catch(() => {});
     };
-  }, [signal, paused, visible]);
+  }, [signal, paused, visible, publishPresence]);
 
   async function perform(
     action: CollaborationAction | null,
